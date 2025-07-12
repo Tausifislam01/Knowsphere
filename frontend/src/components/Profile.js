@@ -114,7 +114,6 @@ function Profile() {
                   width: '150px',
                   height: '150px',
                   objectFit: 'cover',
-                  backgroundColor: '#f8f9fa',
                 }}
               />
               <h4 className="card-title mb-1">{user.fullName || user.username}</h4>
@@ -132,14 +131,14 @@ function Profile() {
                 )}
               </div>
               <button
-                className="btn btn-primary mt-auto w-75"
+                className="glossy-button mt-auto w-75"
                 onClick={() => navigate('/edit-profile')}
               >
                 <i className="bi bi-pencil-square me-2"></i>
                 Edit Profile
               </button>
               <button
-                className="btn btn-outline-danger mt-2 w-75"
+                className="glossy-button mt-2 w-75 bg-danger hover:bg-danger-dark"
                 onClick={() => setShowDeleteModal(true)}
               >
                 <i className="bi bi-trash me-2"></i>
@@ -156,7 +155,7 @@ function Profile() {
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <h3 className="mb-0">Your Insights</h3>
                 <button
-                  className="btn btn-sm btn-outline-primary"
+                  className="glossy-button btn-sm"
                   onClick={() => navigate('/insights/new')}
                 >
                   <i className="bi bi-plus-lg me-1"></i> New
@@ -167,7 +166,7 @@ function Profile() {
                   <i className="bi bi-lightbulb text-muted" style={{ fontSize: '3rem' }}></i>
                   <p className="text-muted mt-3">No insights posted yet.</p>
                   <button
-                    className="btn btn-primary mt-2"
+                    className="glossy-button mt-2"
                     onClick={() => navigate('/insights/new')}
                   >
                     Create Your First Insight
@@ -184,7 +183,7 @@ function Profile() {
                         </div>
                         <div className="dropdown ms-2">
                           <button
-                            className="btn btn-sm btn-outline-secondary"
+                            className="glossy-button btn-sm"
                             type="button"
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
@@ -235,28 +234,28 @@ function Profile() {
               <h5 className="card-title mb-3">Quick Actions</h5>
               <div className="d-grid gap-2">
                 <button
-                  className="btn btn-outline-primary text-start d-flex align-items-center"
+                  className="glossy-button text-start d-flex align-items-center"
                   onClick={() => navigate('/insights/new')}
                 >
                   <i className="bi bi-pencil-square me-2"></i>
                   Create Insight
                 </button>
                 <button
-                  className="btn btn-outline-primary text-start d-flex align-items-center"
+                  className="glossy-button text-start d-flex align-items-center"
                   onClick={() => navigate('/bookmarks')}
                 >
                   <i className="bi bi-bookmark me-2"></i>
                   Bookmarks
                 </button>
                 <button
-                  className="btn btn-outline-primary text-start d-flex align-items-center"
+                  className="glossy-button text-start d-flex align-items-center"
                   onClick={() => navigate('/settings')}
                 >
                   <i className="bi bi-gear me-2"></i>
                   Settings
                 </button>
                 <button
-                  className="btn btn-outline-danger text-start d-flex align-items-center"
+                  className="glossy-button text-start d-flex align-items-center bg-danger hover:bg-danger-dark"
                   onClick={handleLogout}
                 >
                   <i className="bi bi-box-arrow-right me-2"></i>
@@ -289,7 +288,7 @@ function Profile() {
             <strong className="me-auto">Error</strong>
             <button
               type="button"
-              className="btn-close btn-close-white"
+              className="btn-close"
               onClick={() => setError('')}
             ></button>
           </div>
@@ -306,7 +305,7 @@ function Profile() {
                 <h5 className="modal-title">Delete Profile</h5>
                 <button
                   type="button"
-                  className="btn-close btn-close-white"
+                  className="btn-close"
                   onClick={() => {
                     setShowDeleteModal(false);
                     setDeletePassword('');
@@ -334,7 +333,7 @@ function Profile() {
                 <div className="modal-footer">
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="glossy-button bg-secondary hover:bg-secondary-dark"
                     onClick={() => {
                       setShowDeleteModal(false);
                       setDeletePassword('');
@@ -343,7 +342,7 @@ function Profile() {
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-danger">
+                  <button type="submit" className="glossy-button bg-danger hover:bg-danger-dark">
                     <i className="bi bi-trash me-2"></i> Delete Profile
                   </button>
                 </div>

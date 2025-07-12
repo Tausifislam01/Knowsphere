@@ -1,0 +1,119 @@
+/* style.css */
+:root {
+  --navbar-bg: #000000;
+  --navbar-text: #ffffff;
+  --button-bg: #000000;
+  --button-text: #ffffff;
+  --button-hover: #333333;
+  --card-bg: #1a1a1a;
+  --card-text: #ffffff;
+  --glossy-effect: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0) 51%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+}
+
+/* Base styles */
+body {
+  background-color: #111111;
+  color: var(--card-text);
+  font-family: 'Arial', sans-serif;
+}
+
+/* Navbar */
+.glossy-navbar {
+  background-color: var(--navbar-bg);
+  background-image: var(--glossy-effect);
+  color: var(--navbar-text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.navbar-brand, .nav-link {
+  color: var(--navbar-text) !important;
+}
+
+.nav-link:hover {
+  color: var(--accent-light) !important;
+}
+
+/* Buttons */
+.glossy-button {
+  background-color: var(--button-bg);
+  background-image: var(--glossy-effect);
+  color: var(--button-text);
+  border: none;
+  transition: all 0.3s ease;
+  padding: 8px 16px;
+  border-radius: 4px;
+}
+
+.glossy-button:hover {
+  background-color: var(--button-hover);
+  transform: translateY(-1px);
+  color: var(--button-text);
+}
+
+.btn-outline-primary {
+  border-color: var(--button-text);
+  color: var(--button-text);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+}
+
+/* Cards */
+.glossy-card {
+  background-color: var(--card-bg);
+  color: var(--card-text);
+  border: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+
+/* Forms */
+.form-control {
+  background-color: #2d2d2d;
+  border-color: #444;
+  color: white;
+}
+
+.form-control:focus {
+  background-color: #333;
+  color: white;
+  border-color: #555;
+}
+
+.form-label {
+  color: var(--accent-light);
+}
+
+/* Text colors */
+.text-muted {
+  color: #aaaaaa !important;
+}
+
+.text-danger {
+  color: var(--danger) !important;
+}
+
+/* Modal */
+.modal-content {
+  background-color: var(--card-bg);
+  color: var(--card-text);
+}
+
+/* Toast */
+.toast {
+  background-color: var(--card-bg);
+  color: var(--card-text);
+}
+
+.error-toast {
+  background-color: var(--danger);
+  color: white;
+}

@@ -3,12 +3,10 @@ node_modules/
 npm-debug.log
 yarn-error.log
 yarn.lock
-package-lock.json
-backend/package-lock.json
-frontend/package-lock.json
+**/package-lock.json
 
 # Environment variables
-.env
+.env*
 
 # Build outputs
 frontend/build/

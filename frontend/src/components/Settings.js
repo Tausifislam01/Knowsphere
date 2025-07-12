@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
-function Signup() {
+function Settings() {
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -16,17 +17,20 @@ function Signup() {
   };
 
   const validateForm = () => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.username.trim()) {
-      setError('Username is required');
+    if (!formData.currentPassword) {
+      setError('Current password is required');
       return false;
     }
-    if (!emailRegex.test(formData.email)) {
-      setError('Invalid email format');
+    if (!formData.newPassword) {
+      setError('New password is required');
       return false;
     }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (formData.newPassword.length < 6) {
+      setError('New password must be at least 6 characters');
+      return false;
+    }
+    if (formData.newPassword !== formData.confirmPassword) {
+      setError('Passwords do not match');
       return false;
     }
     return true;
@@ -35,23 +39,28 @@ function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     if (!validateForm()) return;
     
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
-        method: 'POST',
+      const response = await fetch('http://localhost:5000/api/auth/change-password', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          currentPassword: formData.currentPassword,
+          newPassword: formData.newPassword,
+        }),
       });
       const data = await response.json();
       if (response.ok) {
-        localStorage.setItem('token', data.token);
-        navigate('/');
+        setSuccess('Password changed successfully');
+        setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
-        setError(data.message || 'Failed to sign up');
+        setError(data.message || 'Failed to change password');
       }
     } catch (error) {
       setError('Error: ' + error.message);
@@ -61,15 +70,15 @@ function Signup() {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center bg-light">
+    <div className="min-vh-100 bg-light">
       <div className="container py-5">
         <div className="row justify-content-center">
-          <div className="col-md-8 col-lg-6 col-xl-5">
-            <div className="card border-0 shadow-lg rounded-4 overflow-hidden">
-              <div className="card-header glossy-navbar p-4 text-center">
+          <div className="col-lg-8 col-xl-6">
+            <div className="card border-0 shadow rounded-4 overflow-hidden">
+              <div className="card-header glossy-navbar p-4">
                 <h2 className="mb-0 text-black">
-                  <i className="bi bi-person-plus-fill me-2"></i>
-                  Create Account
+                  <i className="bi bi-shield-lock me-2"></i>
+                  Account Settings
                 </h2>
               </div>
               
@@ -81,57 +90,64 @@ function Signup() {
                   </div>
                 )}
 
+                {success && (
+                  <div className="alert alert-success d-flex align-items-center" role="alert">
+                    <i className="bi bi-check-circle-fill me-2"></i>
+                    <div>{success}</div>
+                  </div>
+                )}
+
                 <form onSubmit={handleSubmit}>
                   <div className="mb-4">
-                    <label className="form-label fw-semibold">Username <span className="text-danger">*</span></label>
-                    <div className="input-group">
-                      <span className="input-group-text">
-                        <i className="bi bi-person-fill"></i>
-                      </span>
-                      <input
-                        type="text"
-                        name="username"
-                        className="form-control"
-                        value={formData.username}
-                        onChange={handleChange}
-                        required
-                        placeholder="Enter your username"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="form-label fw-semibold">Email <span className="text-danger">*</span></label>
-                    <div className="input-group">
-                      <span className="input-group-text">
-                        <i className="bi bi-envelope-fill"></i>
-                      </span>
-                      <input
-                        type="email"
-                        name="email"
-                        className="form-control"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                        placeholder="Enter your email"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="form-label fw-semibold">Password <span className="text-danger">*</span></label>
+                    <label className="form-label fw-semibold">Current Password <span className="text-danger">*</span></label>
                     <div className="input-group">
                       <span className="input-group-text">
                         <i className="bi bi-lock-fill"></i>
                       </span>
                       <input
                         type="password"
-                        name="password"
+                        name="currentPassword"
                         className="form-control"
-                        value={formData.password}
+                        value={formData.currentPassword}
                         onChange={handleChange}
                         required
-                        placeholder="Enter password (min 6 characters)"
+                        placeholder="Enter current password"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="form-label fw-semibold">New Password <span className="text-danger">*</span></label>
+                    <div className="input-group">
+                      <span className="input-group-text">
+                        <i className="bi bi-key-fill"></i>
+                      </span>
+                      <input
+                        type="password"
+                        name="newPassword"
+                        className="form-control"
+                        value={formData.newPassword}
+                        onChange={handleChange}
+                        required
+                        placeholder="Enter new password (min 6 characters)"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="form-label fw-semibold">Confirm New Password <span className="text-danger">*</span></label>
+                    <div className="input-group">
+                      <span className="input-group-text">
+                        <i className="bi bi-key-fill"></i>
+                      </span>
+                      <input
+                        type="password"
+                        name="confirmPassword"
+                        className="form-control"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        required
+                        placeholder="Confirm new password"
                       />
                     </div>
                   </div>
@@ -145,26 +161,17 @@ function Signup() {
                       {isLoading ? (
                         <>
                           <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          Signing up...
+                          Updating...
                         </>
                       ) : (
                         <>
-                          <i className="bi bi-person-plus-fill me-2"></i>
-                          Sign Up
+                          <i className="bi bi-save-fill me-2"></i>
+                          Change Password
                         </>
                       )}
                     </button>
                   </div>
                 </form>
-
-                <div className="text-center mt-4">
-                  <p className="mb-0">
-                    Already have an account?{' '}
-                    <Link to="/login" className="text-decoration-none fw-semibold">
-                      Log in
-                    </Link>
-                  </p>
-                </div>
               </div>
             </div>
           </div>
@@ -174,4 +181,4 @@ function Signup() {
   );
 }
 
-export default Signup;
+export default Settings;

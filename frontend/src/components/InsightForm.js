@@ -89,11 +89,11 @@ function InsightForm({ mode = 'create' }) {
         <h2 className="mb-4">{mode === 'edit' ? 'Edit Insight' : 'Create Insight'}</h2>
         {error && (
           <div className="toast show position-fixed bottom-0 end-0 m-3" role="alert">
-            <div className="toast-header bg-danger text-white">
+            <div className="toast-header error-toast">
               <strong className="me-auto">Error</strong>
               <button
                 type="button"
-                className="btn-close btn-close-white"
+                className="btn-close"
                 onClick={() => setError('')}
               ></button>
             </div>
