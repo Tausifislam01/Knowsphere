@@ -1,0 +1,41 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn.lock
+package-lock.json
+backend/package-lock.json
+frontend/package-lock.json
+
+# Environment variables
+.env
+
+# Build outputs
+frontend/build/
+backend/dist/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# MongoDB test files
+backend/test-mongo-driver.js
+backend/test-mongo.js
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
