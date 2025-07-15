@@ -46,7 +46,13 @@ router.post('/signup', async (req, res) => {
     if (user) {
       return res.status(400).json({ message: 'Username or email already exists' });
     }
-    user = new User({ username, email, password });
+    user = new User({ 
+      username, 
+      email, 
+      password, 
+      followers: [], 
+      following: [] 
+    });
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
     await user.save();
@@ -258,6 +264,67 @@ router.post('/forgot-password', async (req, res) => {
     res.json({ message: 'Password reset instructions sent to your email' });
   } catch (error) {
     console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Follow a user
+router.post('/follow/:userId', auth, async (req, res) => {
+  try {
+    const userToFollow = await User.findById(req.params.userId);
+    const currentUser = await User.findById(req.user.id);
+
+    if (!userToFollow || !currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (req.user.id === req.params.userId) {
+      return res.status(400).json({ message: 'Cannot follow yourself' });
+    }
+    if (currentUser.following.includes(req.params.userId)) {
+      return res.status(400).json({ message: 'Already following this user' });
+    }
+
+    currentUser.following.push(req.params.userId);
+    userToFollow.followers.push(req.user.id);
+
+    await currentUser.save();
+    await userToFollow.save();
+
+    const updatedUser = await User.findById(req.user.id).select('-password');
+    res.json({ message: 'User followed', user: updatedUser });
+  } catch (error) {
+    console.error('Follow user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Unfollow a user
+router.post('/unfollow/:userId', auth, async (req, res) => {
+  try {
+    const userToUnfollow = await User.findById(req.params.userId);
+    const currentUser = await User.findById(req.user.id);
+
+    if (!userToUnfollow || !currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (!currentUser.following.includes(req.params.userId)) {
+      return res.status(400).json({ message: 'Not following this user' });
+    }
+
+    currentUser.following = currentUser.following.filter(
+      (id) => id.toString() !== req.params.userId
+    );
+    userToUnfollow.followers = userToUnfollow.followers.filter(
+      (id) => id.toString() !== req.user.id
+    );
+
+    await currentUser.save();
+    await userToUnfollow.save();
+
+    const updatedUser = await User.findById(req.user.id).select('-password');
+    res.json({ message: 'User unfollowed', user: updatedUser });
+  } catch (error) {
+    console.error('Unfollow user error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

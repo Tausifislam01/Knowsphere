@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BookmarkButton from './BookmarkButton';
+import VoteButtons from './VoteButtons';
+import CommentSection from './CommentSection';
 
 function Profile() {
   const [user, setUser] = useState(null);
@@ -26,6 +28,7 @@ function Profile() {
           return;
         }
         setUser(profileData);
+        localStorage.setItem('userId', profileData._id);
 
         const insightsResponse = await fetch('http://localhost:5000/api/insights', {
           headers: {
@@ -60,6 +63,7 @@ function Profile() {
       const data = await response.json();
       if (response.ok) {
         localStorage.removeItem('token');
+        localStorage.removeItem('userId');
         navigate('/login', { replace: true });
       } else {
         setDeleteError(data.message || 'Failed to delete profile');
@@ -71,6 +75,7 @@ function Profile() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('userId');
     navigate('/login', { replace: true });
   };
 
@@ -105,7 +110,7 @@ function Profile() {
       <div className="row g-4">
         {/* Profile Section (Left, 25%) */}
         <div className="col-lg-3">
-          <div className="card shadow-sm h-100">
+          <div className="card glossy-card h-100">
             <div className="card-body d-flex flex-column align-items-center py-4">
               <img
                 src={user.profilePicture || 'https://via.placeholder.com/150'}
@@ -188,7 +193,7 @@ function Profile() {
 
         {/* Main Content (Center, 50%) */}
         <div className="col-lg-6">
-          <div className="card shadow-sm h-100">
+          <div className="card glossy-card h-100">
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <h3 className="mb-0">Your Insights</h3>
@@ -253,7 +258,7 @@ function Profile() {
                         </div>
                       </div>
                       {insight.tags && (
-                        <div className="d-flex flex-wrap gap-2">
+                        <div className="d-flex flex-wrap gap-2 mb-2">
                           {insight.tags.split(',').map((tag, index) => (
                             <span key={index} className="badge bg-light text-dark">
                               #{tag.trim()}
@@ -261,6 +266,12 @@ function Profile() {
                           ))}
                         </div>
                       )}
+                      <VoteButtons
+                        insightId={insight._id}
+                        initialUpvotes={insight.upvotes || []}
+                        initialDownvotes={insight.downvotes || []}
+                      />
+                      <CommentSection insightId={insight._id} />
                     </div>
                   ))}
                 </div>
@@ -271,7 +282,7 @@ function Profile() {
 
         {/* Sidebar (Right, 25%) */}
         <div className="col-lg-3">
-          <div className="card shadow-sm h-100">
+          <div className="card glossy-card h-100">
             <div className="card-body">
               <h5 className="card-title mb-3">Quick Actions</h5>
               <div className="d-grid gap-2">

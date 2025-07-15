@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BookmarkButton from '../components/BookmarkButton';
+import VoteButtons from '../components/VoteButtons';
+import CommentSection from '../components/CommentSection';
 
 function Bookmarks() {
   const [bookmarks, setBookmarks] = useState([]);
@@ -70,11 +72,17 @@ function Bookmarks() {
                     </div>
                   )}
                 </div>
-                <div className="card-footer text-muted d-flex justify-content-between align-items-center">
-                  <span>
-                    Posted by {bookmark.insightId.userId?.username || 'Unknown'} • {bookmark.insightId.visibility}
-                  </span>
-                  <BookmarkButton insightId={bookmark.insightId._id} />
+                <div className="card-footer text-muted">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span>Posted by {bookmark.insightId.userId?.username || 'Unknown'} • {bookmark.insightId.visibility}</span>
+                    <BookmarkButton insightId={bookmark.insightId._id} />
+                  </div>
+                  <VoteButtons
+                    insightId={bookmark.insightId._id}
+                    initialUpvotes={bookmark.insightId.upvotes}
+                    initialDownvotes={bookmark.insightId.downvotes}
+                  />
+                  <CommentSection insightId={bookmark.insightId._id} />
                 </div>
               </div>
             </div>

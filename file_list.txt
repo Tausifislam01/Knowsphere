@@ -1,75 +1,74 @@
-Root Directory:
-- package.json
-- README.md
-
-Backend Directory (/backend):
-- package.json
-- server.js
-- test-mongo.js
-- package-lock.json
-
-Backend Config (/backend/config):
-- ai.js
-- db.js
-
-Backend Controllers (/backend/controllers):
-- authController.js
-- commentController.js
-- insightController.js
-- newController.js
-
-Backend Middleware (/backend/middleware):
-- aiMiddleware.js
-- auth.js
-
-Backend Models (/backend/models):
-- Comment.js
-- Insight.js
-- NewModel.js
-- User.js
-
-Backend Routes (/backend/routes):
-- authroutes.js
-- comments.js
-- insightroutes.js
-- newRoute.js
-
-Frontend Directory (/frontend):
-- package.json
-- tailwind.config.js
-
-Frontend Public (/frontend/public):
-- default-insight.png
-- favicon.ico
-- index.html
-
-Frontend Source (/frontend/src):
-- App.jsx
-- index.css
-- index.jsx
-
-Frontend Assets (/frontend/src/assets):
-[Directory exists]
-
-Frontend Components (/frontend/src/components):
-- BookmarkButton.jsx
-- CommentSection.jsx
-- Common.jsx
-- FollowButton.jsx
-- Footer.jsx
-- InsightForm.jsx
-- Navbar.jsx
-- VoteButtons.jsx
-
-Frontend Context (/frontend/src/context):
-- AuthContext.jsx
-- StateContext.jsx
-
-Frontend Pages (/frontend/src/pages):
-- Bookmarks.jsx
-- ExtraPage.jsx
-- Home.jsx
-
-Frontend Utils (/frontend/src/utils):
-- ai.js
-- api.js
+Knowsphere/
+├── README.md
+├── package.json
+├── project_documentation.txt
+├── file_list.txt
+├── backend/
+│   ├── knowsphere-drive-key.json
+│   ├── package.json
+│   ├── resetProfilePictures.js
+│   ├── server.js
+│   ├── config/
+│   │   ├── ai.js
+│   │   ├── db.js
+│   │   └── test-mongo.js
+│   ├── controllers/
+│   │   ├── authController.js
+│   │   ├── commentController.js
+│   │   ├── insightController.js
+│   │   └── newController.js
+│   ├── middleware/
+│   │   ├── aiMiddleware.js
+│   │   └── auth.js
+│   ├── models/
+│   │   ├── Bookmark.js
+│   │   ├── Comment.js
+│   │   ├── Insight.js
+│   │   ├── NewModel.js
+│   │   └── User.js
+│   ├── routes/
+│   │   ├── authroutes.js
+│   │   ├── bookmarkroutes.js
+│   │   ├── comments.js
+│   │   ├── insightroutes.js
+│   │   └── newRoute.js
+│   └── uploads/
+└── frontend/
+    ├── package.json
+    ├── tailwind.config.js
+    ├── public/
+    │   ├── default-insight.png
+    │   ├── favicon.ico
+    │   └── index.html
+    └── src/
+        ├── App.css
+        ├── App.js
+        ├── index.css
+        ├── index.js
+        ├── style.css
+        ├── assets/
+        ├── components/
+        │   ├── BookmarkButton.js
+        │   ├── CommentSection.js
+        │   ├── Common.js
+        │   ├── EditProfile.js
+        │   ├── FollowButton.js
+        │   ├── Footer.js
+        │   ├── ForgotPassword.js
+        │   ├── InsightForm.js
+        │   ├── Login.js
+        │   ├── Navbar.js
+        │   ├── Profile.js
+        │   ├── Settings.js
+        │   ├── Signup.js
+        │   └── VoteButtons.js
+        ├── context/
+        │   ├── AuthContext.js
+        │   └── StateContext.js
+        ├── pages/
+        │   ├── Bookmarks.js
+        │   ├── ExtraPage.js
+        │   └── Home.js
+        └── utils/
+            ├── ai.js
+            └── api.js

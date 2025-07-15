@@ -28,7 +28,10 @@ function App() {
                   <a className="nav-link" href="/profile">Profile</a>
                   <a className="nav-link" href="/bookmarks">Bookmarks</a>
                   <a className="nav-link" href="/settings">Settings</a>
-                  <a className="nav-link" href="/login" onClick={() => localStorage.removeItem('token')}>
+                  <a className="nav-link" href="/login" onClick={() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('userId');
+                  }}>
                     Logout
                   </a>
                 </>
