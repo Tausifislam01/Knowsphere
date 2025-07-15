@@ -6,8 +6,10 @@ function InsightForm({ mode = 'create' }) {
     title: '',
     body: '',
     tags: '',
+    visibility: 'public',
   });
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -26,6 +28,7 @@ function InsightForm({ mode = 'create' }) {
               title: data.title || '',
               body: data.body || '',
               tags: data.tags || '',
+              visibility: data.visibility || 'public',
             });
           } else {
             setError(data.message || 'Failed to fetch insight');
@@ -49,6 +52,10 @@ function InsightForm({ mode = 'create' }) {
       setError('Body is required');
       return false;
     }
+    if (!['public', 'followers', 'private'].includes(formData.visibility)) {
+      setError('Invalid visibility selection');
+      return false;
+    }
     return true;
   };
 
@@ -58,7 +65,12 @@ function InsightForm({ mode = 'create' }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    setError('');
+    setIsLoading(true);
+    if (!validateForm()) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const url = mode === 'edit' && id 
         ? `http://localhost:5000/api/insights/${id}`
@@ -80,68 +92,132 @@ function InsightForm({ mode = 'create' }) {
       }
     } catch (error) {
       setError('Error: ' + error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="container-fluid py-4">
-      <div className="card shadow-sm p-4">
-        <h2 className="mb-4">{mode === 'edit' ? 'Edit Insight' : 'Create Insight'}</h2>
-        {error && (
-          <div className="toast show position-fixed bottom-0 end-0 m-3" role="alert">
-            <div className="toast-header error-toast">
-              <strong className="me-auto">Error</strong>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={() => setError('')}
-              ></button>
+    <div className="min-vh-100 bg-light">
+      <div className="container py-5">
+        <div className="row justify-content-center">
+          <div className="col-lg-8">
+            <div className="card border-0 shadow rounded-4 overflow-hidden">
+              <div className="card-header glossy-navbar p-4">
+                <h2 className="mb-0 text-black">
+                  <i className="bi bi-lightbulb me-2"></i>
+                  {mode === 'edit' ? 'Edit Insight' : 'Create Insight'}
+                </h2>
+              </div>
+              <div className="card-body p-4 p-md-5">
+                {error && (
+                  <div className="alert alert-danger d-flex align-items-center" role="alert">
+                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                    <div>{error}</div>
+                  </div>
+                )}
+                <form onSubmit={handleSubmit}>
+                  <div className="row g-4">
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">
+                        Title <span className="text-danger">*</span>
+                      </label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-fonts"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="title"
+                          className="form-control"
+                          value={formData.title}
+                          onChange={handleChange}
+                          required
+                          placeholder="Enter insight title"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">
+                        Body <span className="text-danger">*</span>
+                      </label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-text-paragraph"></i>
+                        </span>
+                        <textarea
+                          name="body"
+                          className="form-control"
+                          value={formData.body}
+                          onChange={handleChange}
+                          rows="6"
+                          required
+                          placeholder="Share your insight..."
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Tags (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-tags-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="tags"
+                          className="form-control"
+                          value={formData.tags}
+                          onChange={handleChange}
+                          placeholder="e.g., tech, science, ai"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">
+                        Visibility <span className="text-danger">*</span>
+                      </label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-eye-fill"></i>
+                        </span>
+                        <select
+                          name="visibility"
+                          className="form-select"
+                          value={formData.visibility}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="public">Public</option>
+                          <option value="followers">Followers Only</option>
+                          <option value="private">Private</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="col-12 mt-4">
+                      <button
+                        type="submit"
+                        className="glossy-button w-100 py-3 fw-bold"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            {mode === 'edit' ? 'Saving...' : 'Creating...'}
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-save-fill me-2"></i>
+                            {mode === 'edit' ? 'Save Changes' : 'Create Insight'}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
             </div>
-            <div className="toast-body">{error}</div>
           </div>
-        )}
-        <form onSubmit={handleSubmit}>
-          <div className="row g-3">
-            <div className="col-12">
-              <label className="form-label">Title <span className="text-danger">*</span></label>
-              <input
-                type="text"
-                name="title"
-                className="form-control"
-                value={formData.title}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="col-12">
-              <label className="form-label">Body <span className="text-danger">*</span></label>
-              <textarea
-                name="body"
-                className="form-control"
-                value={formData.body}
-                onChange={handleChange}
-                rows="6"
-                required
-              />
-            </div>
-            <div className="col-12">
-              <label className="form-label">Tags (comma-separated)</label>
-              <input
-                type="text"
-                name="tags"
-                className="form-control"
-                value={formData.tags}
-                onChange={handleChange}
-                placeholder="e.g., tech, science"
-              />
-            </div>
-            <div className="col-12">
-              <button type="submit" className="btn btn-primary w-100">
-                <i className="bi bi-save me-2"></i> {mode === 'edit' ? 'Save Changes' : 'Create Insight'}
-              </button>
-            </div>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

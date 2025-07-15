@@ -37,3 +37,6 @@ backend/test-mongo.js
 *.tmp
 *.bak
 *.cache
+
+
+knowsphere-drive-key.json

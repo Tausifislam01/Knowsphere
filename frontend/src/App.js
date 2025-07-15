@@ -8,6 +8,7 @@ import InsightForm from './components/InsightForm';
 import Home from './pages/Home';
 import Settings from './components/Settings';
 import ForgotPassword from './components/ForgotPassword';
+import Bookmarks from './pages/Bookmarks';
 import './style.css';
 import './index.css';
 
@@ -25,6 +26,7 @@ function App() {
               {isAuthenticated ? (
                 <>
                   <a className="nav-link" href="/profile">Profile</a>
+                  <a className="nav-link" href="/bookmarks">Bookmarks</a>
                   <a className="nav-link" href="/settings">Settings</a>
                   <a className="nav-link" href="/login" onClick={() => localStorage.removeItem('token')}>
                     Logout
@@ -49,6 +51,7 @@ function App() {
           <Route path="/insights/edit/:id" element={<InsightForm mode="edit" />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/bookmarks" element={<Bookmarks />} />
         </Routes>
       </div>
     </Router>

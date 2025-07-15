@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import BookmarkButton from './BookmarkButton';
 
 function Profile() {
   const [user, setUser] = useState(null);
@@ -115,6 +116,7 @@ function Profile() {
                   height: '150px',
                   objectFit: 'cover',
                 }}
+                onError={(e) => (e.target.src = 'https://via.placeholder.com/150')}
               />
               <h4 className="card-title mb-1">{user.fullName || user.username}</h4>
               <p className="text-muted mb-3">{user.bio || 'No bio available'}</p>
@@ -124,9 +126,45 @@ function Profile() {
                   <span className="text-truncate">{user.email}</span>
                 </div>
                 {user.workplace && (
-                  <div className="d-flex align-items-center">
+                  <div className="d-flex align-items-center mb-2">
                     <i className="bi bi-briefcase me-2 text-primary"></i>
                     <span>{user.workplace}</span>
+                  </div>
+                )}
+                {user.location && (
+                  <div className="d-flex align-items-center mb-2">
+                    <i className="bi bi-geo-alt me-2 text-primary"></i>
+                    <span>{user.location}</span>
+                  </div>
+                )}
+                {!user.genderPrivacy && user.gender && (
+                  <div className="d-flex align-items-center mb-2">
+                    <i className="bi bi-person-fill me-2 text-primary"></i>
+                    <span>{user.gender}</span>
+                  </div>
+                )}
+                {user.facebook && (
+                  <div className="d-flex align-items-center mb-2">
+                    <i className="bi bi-facebook me-2 text-primary"></i>
+                    <a href={user.facebook} target="_blank" rel="noopener noreferrer">Facebook</a>
+                  </div>
+                )}
+                {user.linkedin && (
+                  <div className="d-flex align-items-center mb-2">
+                    <i className="bi bi-linkedin me-2 text-primary"></i>
+                    <a href={user.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                  </div>
+                )}
+                {user.github && (
+                  <div className="d-flex align-items-center mb-2">
+                    <i className="bi bi-github me-2 text-primary"></i>
+                    <a href={user.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+                  </div>
+                )}
+                {user.portfolio && (
+                  <div className="d-flex align-items-center mb-2">
+                    <i className="bi bi-briefcase me-2 text-primary"></i>
+                    <a href={user.portfolio} target="_blank" rel="noopener noreferrer">Portfolio</a>
                   </div>
                 )}
               </div>
@@ -180,34 +218,38 @@ function Profile() {
                         <div className="flex-grow-1">
                           <h5 className="mb-1">{insight.title}</h5>
                           <p className="mb-2 text-muted">{insight.body}</p>
+                          <small className="text-muted">Visibility: {insight.visibility}</small>
                         </div>
-                        <div className="dropdown ms-2">
-                          <button
-                            className="glossy-button btn-sm"
-                            type="button"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false"
-                          >
-                            <i className="bi bi-three-dots"></i>
-                          </button>
-                          <ul className="dropdown-menu">
-                            <li>
-                              <button
-                                className="dropdown-item"
-                                onClick={() => handleEditInsight(insight._id)}
-                              >
-                                <i className="bi bi-pencil me-2"></i> Edit
-                              </button>
-                            </li>
-                            <li>
-                              <button
-                                className="dropdown-item text-danger"
-                                onClick={() => handleDeleteInsight(insight._id)}
-                              >
-                                <i className="bi bi-trash me-2"></i> Delete
-                              </button>
-                            </li>
-                          </ul>
+                        <div className="ms-2 d-flex align-items-center">
+                          <BookmarkButton insightId={insight._id} />
+                          <div className="dropdown ms-2">
+                            <button
+                              className="glossy-button btn-sm"
+                              type="button"
+                              data-bs-toggle="dropdown"
+                              aria-expanded="false"
+                            >
+                              <i className="bi bi-three-dots"></i>
+                            </button>
+                            <ul className="dropdown-menu">
+                              <li>
+                                <button
+                                  className="dropdown-item"
+                                  onClick={() => handleEditInsight(insight._id)}
+                                >
+                                  <i className="bi bi-pencil me-2"></i> Edit
+                                </button>
+                              </li>
+                              <li>
+                                <button
+                                  className="dropdown-item text-danger"
+                                  onClick={() => handleDeleteInsight(insight._id)}
+                                >
+                                  <i className="bi bi-trash me-2"></i> Delete
+                                </button>
+                              </li>
+                            </ul>
+                          </div>
                         </div>
                       </div>
                       {insight.tags && (
@@ -270,12 +312,62 @@ function Profile() {
               </div>
               <div className="d-flex justify-content-between mb-2">
                 <span className="text-muted">Following</span>
-                <span className="fw-bold">0</span>
+                <span className="fw-bold">{user.following ? user.following.length : 0}</span>
               </div>
               <div className="d-flex justify-content-between">
                 <span className="text-muted">Followers</span>
-                <span className="fw-bold">0</span>
+                <span className="fw-bold">{user.followers ? user.followers.length : 0}</span>
               </div>
+              <hr className="my-4" />
+              <h6 className="mb-3">Additional Info</h6>
+              {user.skills && user.skills.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-muted">Skills: </span>
+                  <span>{user.skills.join(', ')}</span>
+                </div>
+              )}
+              {user.education && user.education.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-muted">Education: </span>
+                  <span>{user.education.join(', ')}</span>
+                </div>
+              )}
+              {user.workExperience && user.workExperience.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-muted">Work Experience: </span>
+                  <span>{user.workExperience.join(', ')}</span>
+                </div>
+              )}
+              {user.languages && user.languages.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-muted">Languages: </span>
+                  <span>{user.languages.join(', ')}</span>
+                </div>
+              )}
+              {user.interests && user.interests.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-muted">Interests: </span>
+                  <span>{user.interests.join(', ')}</span>
+                </div>
+              )}
+              {user.badges && user.badges.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-muted">Badges: </span>
+                  <span>{user.badges.join(', ')}</span>
+                </div>
+              )}
+              {user.availability && (
+                <div className="mb-2">
+                  <span className="text-muted">Availability: </span>
+                  <span>{user.availability}</span>
+                </div>
+              )}
+              {user.preferredTopics && user.preferredTopics.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-muted">Preferred Topics: </span>
+                  <span>{user.preferredTopics.join(', ')}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

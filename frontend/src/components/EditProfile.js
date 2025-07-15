@@ -7,7 +7,7 @@ function EditProfile() {
     email: '',
     fullName: '',
     bio: '',
-    profilePicture: '',
+    profilePicture: null,
     workplace: '',
     facebook: '',
     linkedin: '',
@@ -25,8 +25,9 @@ function EditProfile() {
     availability: '',
     recentActivity: '',
     preferredTopics: '',
-    genderPrivacy: true,
+    genderPrivacy: false,
   });
+  const [preview, setPreview] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -46,26 +47,27 @@ function EditProfile() {
             email: data.email || '',
             fullName: data.fullName || '',
             bio: data.bio || '',
-            profilePicture: data.profilePicture || '',
             workplace: data.workplace || '',
             facebook: data.facebook || '',
             linkedin: data.linkedin || '',
             github: data.github || '',
-            interests: data.interests || '',
+            interests: data.interests ? data.interests.join(', ') : '',
             gender: data.gender || '',
-            skills: data.skills || '',
-            education: data.education || '',
-            workExperience: data.workExperience || '',
-            languages: data.languages || '',
+            skills: data.skills ? data.skills.join(', ') : '',
+            education: data.education ? data.education.join(', ') : '',
+            workExperience: data.workExperience ? data.workExperience.join(', ') : '',
+            languages: data.languages ? data.languages.join(', ') : '',
             location: data.location || '',
             portfolio: data.portfolio || '',
-            connections: data.connections || '',
-            badges: data.badges || '',
+            connections: data.connections ? data.connections.join(', ') : '',
+            badges: data.badges ? data.badges.join(', ') : '',
             availability: data.availability || '',
-            recentActivity: data.recentActivity || '',
-            preferredTopics: data.preferredTopics || '',
-            genderPrivacy: data.genderPrivacy ?? true,
+            recentActivity: data.recentActivity ? data.recentActivity.join(', ') : '',
+            preferredTopics: data.preferredTopics ? data.preferredTopics.join(', ') : '',
+            genderPrivacy: data.genderPrivacy || false,
+            profilePicture: null,
           });
+          setPreview(data.profilePicture || 'https://via.placeholder.com/150');
         } else {
           setError(data.message || 'Failed to fetch profile');
           navigate('/login');
@@ -79,21 +81,58 @@ function EditProfile() {
   }, [navigate]);
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
+    if (e.target.name === 'profilePicture') {
+      const file = e.target.files[0];
+      setFormData({ ...formData, profilePicture: file });
+      if (file) {
+        setPreview(URL.createObjectURL(file));
+      }
+    } else if (e.target.name === 'genderPrivacy') {
+      setFormData({ ...formData, genderPrivacy: e.target.checked });
+    } else {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
+
+    const form = new FormData();
+    form.append('username', formData.username);
+    form.append('email', formData.email);
+    form.append('fullName', formData.fullName);
+    form.append('bio', formData.bio);
+    form.append('workplace', formData.workplace);
+    form.append('facebook', formData.facebook);
+    form.append('linkedin', formData.linkedin);
+    form.append('github', formData.github);
+    form.append('interests', formData.interests);
+    form.append('gender', formData.gender);
+    form.append('skills', formData.skills);
+    form.append('education', formData.education);
+    form.append('workExperience', formData.workExperience);
+    form.append('languages', formData.languages);
+    form.append('location', formData.location);
+    form.append('portfolio', formData.portfolio);
+    form.append('connections', formData.connections);
+    form.append('badges', formData.badges);
+    form.append('availability', formData.availability);
+    form.append('recentActivity', formData.recentActivity);
+    form.append('preferredTopics', formData.preferredTopics);
+    form.append('genderPrivacy', formData.genderPrivacy.toString());
+    if (formData.profilePicture) {
+      form.append('profilePicture', formData.profilePicture);
+    }
+
     try {
       const response = await fetch('http://localhost:5000/api/auth/profile', {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify(formData),
+        body: form,
       });
       if (response.ok) {
         navigate('/profile');
@@ -112,15 +151,13 @@ function EditProfile() {
     <div className="min-vh-100 bg-light">
       <div className="container py-5">
         <div className="row justify-content-center">
-          <div className="col-lg-10">
+          <div className="col-lg-8">
             <div className="card border-0 shadow rounded-4 overflow-hidden">
               <div className="card-header glossy-navbar p-4">
                 <h2 className="mb-0 text-black">
-                  <i className="bi bi-person-gear me-2"></i>
-                  Edit Profile
+                  <i className="bi bi-pencil-square me-2"></i> Edit Profile
                 </h2>
               </div>
-              
               <div className="card-body p-4 p-md-5">
                 {error && (
                   <div className="alert alert-danger d-flex align-items-center" role="alert">
@@ -128,366 +165,388 @@ function EditProfile() {
                     <div>{error}</div>
                   </div>
                 )}
-
                 <form onSubmit={handleSubmit}>
                   <div className="row g-4">
-                    {/* Personal Information Section */}
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Username <span className="text-danger">*</span></label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-person-fill"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="username"
-                            className="form-control"
-                            value={formData.username}
-                            onChange={handleChange}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Email <span className="text-danger">*</span></label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-envelope-fill"></i>
-                          </span>
-                          <input
-                            type="email"
-                            name="email"
-                            className="form-control"
-                            value={formData.email}
-                            onChange={handleChange}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Full Name</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-card-heading"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="fullName"
-                            className="form-control"
-                            value={formData.fullName}
-                            onChange={handleChange}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Workplace</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-building"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="workplace"
-                            className="form-control"
-                            value={formData.workplace}
-                            onChange={handleChange}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Location</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-geo-alt-fill"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="location"
-                            className="form-control"
-                            value={formData.location}
-                            onChange={handleChange}
-                          />
-                        </div>
-                      </div>
+                    <div className="col-12 text-center">
+                      <img
+                        src={preview}
+                        className="rounded-circle border border-4 border-light shadow mb-3"
+                        alt="Profile Preview"
+                        style={{ width: '150px', height: '150px', objectFit: 'cover' }}
+                        onError={(e) => (e.target.src = 'https://via.placeholder.com/150')}
+                      />
                     </div>
-
-                    {/* Profile Picture Section */}
                     <div className="col-md-6">
-                      <div className="mb-4 text-center">
-                        <label className="form-label fw-semibold">Profile Picture</label>
-                        <div className="d-flex flex-column align-items-center">
-                          <img
-                            src={formData.profilePicture || 'https://via.placeholder.com/150'}
-                            className="rounded-circle border border-3 border-light mb-3"
-                            alt="Profile"
-                            style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                          />
-                          <div className="input-group">
-                            <span className="input-group-text">
-                              <i className="bi bi-image-fill"></i>
-                            </span>
-                            <input
-                              type="text"
-                              name="profilePicture"
-                              className="form-control"
-                              value={formData.profilePicture}
-                              onChange={handleChange}
-                              placeholder="Enter image URL"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Gender</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-gender-ambiguous"></i>
-                          </span>
-                          <select
-                            name="gender"
-                            className="form-select"
-                            value={formData.gender}
-                            onChange={handleChange}
-                          >
-                            <option value="">Select gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="form-check mb-4">
+                      <label className="form-label fw-semibold">Username <span className="text-danger">*</span></label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-person-fill"></i>
+                        </span>
                         <input
-                          type="checkbox"
-                          name="genderPrivacy"
-                          className="form-check-input"
-                          checked={formData.genderPrivacy}
+                          type="text"
+                          name="username"
+                          className="form-control"
+                          value={formData.username}
                           onChange={handleChange}
-                          id="genderPrivacy"
+                          required
+                          placeholder="Enter username"
                         />
-                        <label className="form-check-label" htmlFor="genderPrivacy">
-                          Keep gender private
-                        </label>
                       </div>
                     </div>
-
-                    {/* Bio Section */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Email <span className="text-danger">*</span></label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-envelope-fill"></i>
+                        </span>
+                        <input
+                          type="email"
+                          name="email"
+                          className="form-control"
+                          value={formData.email}
+                          onChange={handleChange}
+                          required
+                          placeholder="Enter email"
+                        />
+                      </div>
+                    </div>
                     <div className="col-12">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Bio</label>
+                      <label className="form-label fw-semibold">Full Name</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-person-circle"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="fullName"
+                          className="form-control"
+                          value={formData.fullName}
+                          onChange={handleChange}
+                          placeholder="Enter full name"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Profile Picture</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-image-fill"></i>
+                        </span>
+                        <input
+                          type="file"
+                          name="profilePicture"
+                          className="form-control"
+                          accept="image/*"
+                          onChange={handleChange}
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Bio</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-text-paragraph"></i>
+                        </span>
                         <textarea
                           name="bio"
                           className="form-control"
                           value={formData.bio}
                           onChange={handleChange}
                           rows="4"
-                          placeholder="Tell us about yourself..."
+                          placeholder="Tell us about yourself"
                         />
                       </div>
                     </div>
-
-                    {/* Social Links Section */}
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Workplace</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-briefcase-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="workplace"
+                          className="form-control"
+                          value={formData.workplace}
+                          onChange={handleChange}
+                          placeholder="Enter workplace"
+                        />
+                      </div>
+                    </div>
                     <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Facebook URL</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-facebook"></i>
-                          </span>
+                      <label className="form-label fw-semibold">Facebook URL</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-facebook"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="facebook"
+                          className="form-control"
+                          value={formData.facebook}
+                          onChange={handleChange}
+                          placeholder="Enter Facebook URL"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">LinkedIn URL</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-linkedin"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="linkedin"
+                          className="form-control"
+                          value={formData.linkedin}
+                          onChange={handleChange}
+                          placeholder="Enter LinkedIn URL"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">GitHub URL</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-github"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="github"
+                          className="form-control"
+                          value={formData.github}
+                          onChange={handleChange}
+                          placeholder="Enter GitHub URL"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Portfolio URL</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-briefcase-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="portfolio"
+                          className="form-control"
+                          value={formData.portfolio}
+                          onChange={handleChange}
+                          placeholder="Enter portfolio URL"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Interests (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-star-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="interests"
+                          className="form-control"
+                          value={formData.interests}
+                          onChange={handleChange}
+                          placeholder="e.g., coding, AI, music"
+                        />
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Gender</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-person-fill"></i>
+                        </span>
+                        <select
+                          name="gender"
+                          className="form-control"
+                          value={formData.gender}
+                          onChange={handleChange}
+                        >
+                          <option value="">Select gender</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Gender Privacy</label>
+                      <div className="input-group">
+                        <div className="form-check">
                           <input
-                            type="text"
-                            name="facebook"
-                            className="form-control"
-                            value={formData.facebook}
+                            type="checkbox"
+                            name="genderPrivacy"
+                            className="form-check-input"
+                            checked={formData.genderPrivacy}
                             onChange={handleChange}
-                            placeholder="https://facebook.com/username"
                           />
+                          <label className="form-check-label">Keep gender private</label>
                         </div>
                       </div>
                     </div>
-
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">LinkedIn URL</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-linkedin"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="linkedin"
-                            className="form-control"
-                            value={formData.linkedin}
-                            onChange={handleChange}
-                            placeholder="https://linkedin.com/in/username"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Skills (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-tools"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="skills"
+                          className="form-control"
+                          value={formData.skills}
+                          onChange={handleChange}
+                          placeholder="e.g., JavaScript, Python, React"
+                        />
                       </div>
                     </div>
-
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">GitHub URL</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-github"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="github"
-                            className="form-control"
-                            value={formData.github}
-                            onChange={handleChange}
-                            placeholder="https://github.com/username"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Education (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-book-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="education"
+                          className="form-control"
+                          value={formData.education}
+                          onChange={handleChange}
+                          placeholder="e.g., BSc in CS, MBA"
+                        />
                       </div>
                     </div>
-
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Portfolio URL</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-globe2"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="portfolio"
-                            className="form-control"
-                            value={formData.portfolio}
-                            onChange={handleChange}
-                            placeholder="https://yourportfolio.com"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Work Experience (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-briefcase-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="workExperience"
+                          className="form-control"
+                          value={formData.workExperience}
+                          onChange={handleChange}
+                          placeholder="e.g., Software Engineer at XYZ, 2020-2022"
+                        />
                       </div>
                     </div>
-
-                    {/* Skills & Interests Section */}
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Skills</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-tools"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="skills"
-                            className="form-control"
-                            value={formData.skills}
-                            onChange={handleChange}
-                            placeholder="e.g., JavaScript, Python, Design"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Languages (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-globe"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="languages"
+                          className="form-control"
+                          value={formData.languages}
+                          onChange={handleChange}
+                          placeholder="e.g., English, Spanish"
+                        />
                       </div>
                     </div>
-
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Interests</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-heart-fill"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="interests"
-                            className="form-control"
-                            value={formData.interests}
-                            onChange={handleChange}
-                            placeholder="e.g., Coding, AI, Photography"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Location</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-geo-alt-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="location"
+                          className="form-control"
+                          value={formData.location}
+                          onChange={handleChange}
+                          placeholder="Enter location"
+                        />
                       </div>
                     </div>
-
-                    {/* Education & Experience Section */}
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Education</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-mortarboard-fill"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="education"
-                            className="form-control"
-                            value={formData.education}
-                            onChange={handleChange}
-                            placeholder="e.g., University of XYZ, Computer Science"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Connections (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-people-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="connections"
+                          className="form-control"
+                          value={formData.connections}
+                          onChange={handleChange}
+                          placeholder="e.g., user1, user2"
+                        />
                       </div>
                     </div>
-
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Work Experience</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-briefcase-fill"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="workExperience"
-                            className="form-control"
-                            value={formData.workExperience}
-                            onChange={handleChange}
-                            placeholder="e.g., Software Engineer at ABC Corp"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Badges (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-award-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="badges"
+                          className="form-control"
+                          value={formData.badges}
+                          onChange={handleChange}
+                          placeholder="e.g., Top Contributor, Verified"
+                        />
                       </div>
                     </div>
-
-                    {/* Additional Information Section */}
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Languages</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-translate"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="languages"
-                            className="form-control"
-                            value={formData.languages}
-                            onChange={handleChange}
-                            placeholder="e.g., English, Spanish"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Availability</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-clock-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="availability"
+                          className="form-control"
+                          value={formData.availability}
+                          onChange={handleChange}
+                          placeholder="e.g., Available for freelance"
+                        />
                       </div>
                     </div>
-
-                    <div className="col-md-6">
-                      <div className="mb-4">
-                        <label className="form-label fw-semibold">Preferred Topics</label>
-                        <div className="input-group">
-                          <span className="input-group-text">
-                            <i className="bi bi-bookmark-fill"></i>
-                          </span>
-                          <input
-                            type="text"
-                            name="preferredTopics"
-                            className="form-control"
-                            value={formData.preferredTopics}
-                            onChange={handleChange}
-                            placeholder="e.g., Technology, Science, Art"
-                          />
-                        </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Recent Activity (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-activity"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="recentActivity"
+                          className="form-control"
+                          value={formData.recentActivity}
+                          onChange={handleChange}
+                          placeholder="e.g., Posted insight, Commented"
+                        />
                       </div>
                     </div>
-
-                    {/* Save Button */}
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Preferred Topics (comma-separated)</label>
+                      <div className="input-group">
+                        <span className="input-group-text">
+                          <i className="bi bi-bookmark-fill"></i>
+                        </span>
+                        <input
+                          type="text"
+                          name="preferredTopics"
+                          className="form-control"
+                          value={formData.preferredTopics}
+                          onChange={handleChange}
+                          placeholder="e.g., AI, Web Development"
+                        />
+                      </div>
+                    </div>
                     <div className="col-12 mt-4">
                       <button
                         type="submit"
