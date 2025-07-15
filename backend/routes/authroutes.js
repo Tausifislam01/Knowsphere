@@ -4,6 +4,29 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const fs = require('fs').promises;
+
+// Multer setup for file uploads
+const upload = multer({ dest: 'uploads/' });
+
+// Helper function to extract public ID from Cloudinary URL
+const getPublicIdFromUrl = (url) => {
+  if (!url || !url.includes('cloudinary.com')) {
+    return null;
+  }
+  try {
+    const parts = url.split('/upload/');
+    if (parts.length < 2) return null;
+    const afterUpload = parts[1];
+    const publicId = afterUpload.replace(/^v\d+\//, '').replace(/\.\w+$/, '');
+    return publicId;
+  } catch (error) {
+    console.error('Error extracting public ID:', error);
+    return null;
+  }
+};
 
 // Signup
 router.post('/signup', async (req, res) => {
@@ -31,6 +54,7 @@ router.post('/signup', async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.status(201).json({ token });
   } catch (error) {
+    console.error('Signup error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -51,6 +75,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -64,78 +89,104 @@ router.get('/profile', auth, async (req, res) => {
     }
     res.json(user);
   } catch (error) {
+    console.error('Get profile error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
 // Update Profile
-router.put('/profile', auth, async (req, res) => {
+router.put('/profile', auth, upload.single('profilePicture'), async (req, res) => {
   const {
-    username, email, fullName, bio, profilePicture, workplace, facebook,
-    linkedin, github, interests, gender, skills, education, workExperience,
-    languages, location, portfolio, connections, badges, availability,
-    recentActivity, preferredTopics, genderPrivacy
+    username, email, fullName, bio, workplace, facebook,
+    linkedin, github, interests, gender, skills, education,
+    workExperience, languages, location, portfolio, connections,
+    badges, availability, recentActivity, preferredTopics, genderPrivacy
   } = req.body;
+
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    if (username && username !== user.username) {
-      const existingUser = await User.findOne({ username });
-      if (existingUser) {
-        return res.status(400).json({ message: 'Username already exists' });
+
+    const oldProfilePicture = user.profilePicture;
+    let profilePicture = oldProfilePicture;
+
+    if (req.file) {
+      try {
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: 'knowsphere_profiles',
+          public_id: `${req.user.id}-${Date.now()}-${req.file.originalname}`,
+        });
+        profilePicture = result.secure_url;
+        await fs.unlink(req.file.path);
+
+        if (oldProfilePicture && 
+            oldProfilePicture !== 'https://via.placeholder.com/150' && 
+            oldProfilePicture.includes('cloudinary.com')) {
+          const publicId = getPublicIdFromUrl(oldProfilePicture);
+          if (publicId) {
+            const deleteResult = await cloudinary.uploader.destroy(publicId);
+            console.log('Old profile picture delete attempt:', { publicId, result: deleteResult });
+            if (deleteResult.result === 'not found') {
+              profilePicture = 'https://via.placeholder.com/150';
+            }
+          } else {
+            profilePicture = 'https://via.placeholder.com/150';
+          }
+        }
+      } catch (cloudinaryError) {
+        console.error('Cloudinary upload error:', cloudinaryError);
+        try {
+          await fs.unlink(req.file.path);
+        } catch (unlinkError) {
+          console.error('Failed to delete temporary file:', unlinkError);
+        }
+        return res.status(500).json({ message: 'Failed to upload image to Cloudinary' });
       }
     }
-    if (email && email !== user.email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({ message: 'Invalid email format' });
-      }
-      const existingEmail = await User.findOne({ email });
-      if (existingEmail) {
-        return res.status(400).json({ message: 'Email already exists' });
-      }
-    }
-    const urlRegex = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w-./?%&=]*)?$/;
-    if (facebook && !urlRegex.test(facebook)) {
-      return res.status(400).json({ message: 'Invalid Facebook URL' });
-    }
-    if (linkedin && !urlRegex.test(linkedin)) {
-      return res.status(400).json({ message: 'Invalid LinkedIn URL' });
-    }
-    if (github && !urlRegex.test(github)) {
-      return res.status(400).json({ message: 'Invalid GitHub URL' });
-    }
-    if (portfolio && !urlRegex.test(portfolio)) {
-      return res.status(400).json({ message: 'Invalid Portfolio URL' });
-    }
+
     user.username = username || user.username;
     user.email = email || user.email;
     user.fullName = fullName || user.fullName;
     user.bio = bio || user.bio;
-    user.profilePicture = profilePicture || user.profilePicture;
     user.workplace = workplace || user.workplace;
+    user.profilePicture = profilePicture;
     user.facebook = facebook || user.facebook;
     user.linkedin = linkedin || user.linkedin;
     user.github = github || user.github;
-    user.interests = interests || user.interests;
+    user.interests = interests ? interests.split(',').map(item => item.trim()) : user.interests;
     user.gender = gender || user.gender;
-    user.skills = skills || user.skills;
-    user.education = education || user.education;
-    user.workExperience = workExperience || user.workExperience;
-    user.languages = languages || user.languages;
+    user.skills = skills ? skills.split(',').map(item => item.trim()) : user.skills;
+    user.education = education ? education.split(',').map(item => item.trim()) : user.education;
+    user.workExperience = workExperience ? workExperience.split(',').map(item => item.trim()) : user.workExperience;
+    user.languages = languages ? languages.split(',').map(item => item.trim()) : user.languages;
     user.location = location || user.location;
     user.portfolio = portfolio || user.portfolio;
-    user.connections = connections || user.connections;
-    user.badges = badges || user.badges;
+    user.connections = connections ? connections.split(',').map(item => item.trim()) : user.connections;
+    user.badges = badges ? badges.split(',').map(item => item.trim()) : user.badges;
     user.availability = availability || user.availability;
-    user.recentActivity = recentActivity || user.recentActivity;
-    user.preferredTopics = preferredTopics || user.preferredTopics;
-    user.genderPrivacy = genderPrivacy !== undefined ? genderPrivacy : user.genderPrivacy;
+    user.recentActivity = recentActivity ? recentActivity.split(',').map(item => item.trim()) : user.recentActivity;
+    user.preferredTopics = preferredTopics ? preferredTopics.split(',').map(item => item.trim()) : user.preferredTopics;
+    user.genderPrivacy = genderPrivacy !== undefined ? genderPrivacy === 'true' : user.genderPrivacy;
+
     await user.save();
     res.json(user);
   } catch (error) {
+    console.error('Profile update error:', error);
+    if (req.file) {
+      try {
+        await fs.unlink(req.file.path);
+      } catch (unlinkError) {
+        console.error('Failed to delete temporary file:', unlinkError);
+      }
+    }
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -152,9 +203,21 @@ router.delete('/delete', auth, async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Incorrect password' });
     }
-    await User.deleteOne({ _id: req.user.id });
+
+    if (user.profilePicture && 
+        user.profilePicture !== 'https://via.placeholder.com/150' && 
+        user.profilePicture.includes('cloudinary.com')) {
+      const publicId = getPublicIdFromUrl(user.profilePicture);
+      if (publicId) {
+        const deleteResult = await cloudinary.uploader.destroy(publicId);
+        console.log('Profile picture deleted on account deletion:', { publicId, result: deleteResult });
+      }
+    }
+
+    await User.deleteOne({ _id: user.id });
     res.json({ message: 'Profile deleted' });
   } catch (error) {
+    console.error('Delete profile error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -179,10 +242,12 @@ router.put('/change-password', auth, async (req, res) => {
     await user.save();
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
+    console.error('Change password error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
+// Forgot Password
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
   try {
@@ -190,10 +255,9 @@ router.post('/forgot-password', async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    // In a real app, generate and send a reset token via email
-    // For simplicity, return a message (extend with email service later)
     res.json({ message: 'Password reset instructions sent to your email' });
   } catch (error) {
+    console.error('Forgot password error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
