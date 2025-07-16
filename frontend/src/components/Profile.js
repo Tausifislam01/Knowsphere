@@ -218,7 +218,7 @@ function Profile() {
               ) : (
                 <div className="list-group list-group-flush">
                   {insights.map((insight) => (
-                    <div key={insight._id} className="list-group-item border-0 py-3 px-0">
+                    <div key={insight._id} id={`insight-${insight._id}`} className="list-group-item border-0 py-3 px-0">
                       <div className="d-flex align-items-start mb-2">
                         <div className="flex-grow-1">
                           <h5 className="mb-1">{insight.title}</h5>

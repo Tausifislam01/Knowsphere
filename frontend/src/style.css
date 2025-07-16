@@ -7,6 +7,8 @@
   --button-hover: #333333;
   --card-bg: #1a1a1a;
   --card-text: #ffffff;
+  --accent-light: #cccccc; /* Added to fix undefined variable */
+  --danger: #dc3545; /* Added for text-danger consistency */
   --glossy-effect: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0.2) 0%,
@@ -66,6 +68,63 @@ body {
   color: var(--button-text);
 }
 
+/* Ensure comment section is visible */
+.comment-section {
+  display: block !important;
+  visibility: visible !important;
+  min-height: 40px;
+  position: relative;
+  z-index: 10;
+}
+
+/* Ensure Show Comments button is visible */
+.show-comments-btn {
+  display: inline-block !important;
+  visibility: visible !important;
+  color: #ffffff !important;
+  background-color: transparent !important;
+  text-decoration: none;
+  padding: 0;
+  margin-bottom: 1rem;
+  z-index: 10;
+}
+
+.show-comments-btn:hover {
+  text-decoration: underline;
+  color: var(--accent-light) !important;
+}
+
+/* Fix card-footer in Home.js */
+.card-footer.bg-transparent {
+  background-color: transparent !important;
+  border-top: none;
+  display: block !important;
+  visibility: visible !important;
+  padding: 1rem;
+}
+
+/* Fix list-group-item in Profile.js */
+.list-group-item {
+  background-color: var(--card-bg);
+  color: var(--card-text);
+  display: block !important;
+  visibility: visible !important;
+  padding: 1rem;
+}
+
+/* Fix btn-link for all buttons */
+.btn-link {
+  color: #ffffff !important;
+  text-decoration: none;
+  display: inline-block !important;
+  visibility: visible !important;
+}
+
+.btn-link:hover {
+  color: var(--accent-light) !important;
+  text-decoration: underline;
+}
+
 /* Cards */
 .glossy-card {
   background-color: var(--card-bg);
@@ -116,4 +175,92 @@ body {
 .error-toast {
   background-color: var(--danger);
   color: white;
+}
+
+/* Comment Section Styles */
+.comments-list {
+  max-height: 500px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-light) transparent;
+  padding-right: 10px;
+}
+
+.comments-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.comments-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.comments-list::-webkit-scrollbar-thumb {
+  background-color: var(--accent-light);
+  border-radius: 3px;
+}
+
+.comment-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 0;
+  margin-bottom: 10px;
+  transition: background-color 0.2s ease;
+}
+
+.comment-item:last-child {
+  border-bottom: none;
+}
+
+.comment-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.comment-author {
+  font-weight: bold;
+  color: var(--accent-light);
+}
+
+.comment-date {
+  font-size: 0.85em;
+  color: var(--accent-light);
+}
+
+.comment-actions {
+  margin-top: 5px;
+  display: flex;
+  gap: 10px;
+}
+
+.comment-input {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--card-text);
+}
+
+.comment-input:focus {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--card-text);
+  box-shadow: none;
+}
+
+/* Reply toggle buttons */
+.btn-link {
+  color: var(--accent-light);
+  text-decoration: none;
+}
+
+.btn-link:hover {
+  color: var(--card-text);
+}
+
+/* Scroll to top button transition */
+.scroll-top-button {
+  transition: opacity 0.3s ease;
 }

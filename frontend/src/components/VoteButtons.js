@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// VoteButtons.js
+import React, { useState } from 'react';
 
 function VoteButtons({ insightId, initialUpvotes, initialDownvotes }) {
   const [upvotes, setUpvotes] = useState(initialUpvotes || []);
@@ -34,13 +35,13 @@ function VoteButtons({ insightId, initialUpvotes, initialDownvotes }) {
   return (
     <div className="d-flex align-items-center gap-2">
       <button
-        className={`btn ${upvotes.includes(userId) ? 'btn-success' : 'btn-outline-success'} glossy-button btn-sm`}
+        className={`btn ${upvotes.includes(userId) ? 'btn-success' : 'btn-outline-success'} vote-button btn-sm`}
         onClick={() => handleVote('upvote')}
       >
         <i className="bi bi-arrow-up me-1"></i> {upvotes.length}
       </button>
       <button
-        className={`btn ${downvotes.includes(userId) ? 'btn-danger' : 'btn-outline-danger'} glossy-button btn-sm`}
+        className={`btn ${downvotes.includes(userId) ? 'btn-danger' : 'btn-outline-danger'} vote-button btn-sm`}
         onClick={() => handleVote('downvote')}
       >
         <i className="bi bi-arrow-down me-1"></i> {downvotes.length}

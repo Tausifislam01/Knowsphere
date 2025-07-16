@@ -143,7 +143,7 @@ function Home() {
       ) : (
         <div className="row g-4">
           {filteredInsights.map(insight => (
-            <div key={insight._id} className="col-lg-6">
+            <div key={insight._id} id={`insight-${insight._id}`} className="col-lg-6">
               <div className="card border-0 shadow-sm rounded-3 overflow-hidden h-100">
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-start mb-3">
