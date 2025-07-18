@@ -1,11 +1,55 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import BookmarkButton from '../components/BookmarkButton';
-import VoteButtons from '../components/VoteButtons';
-import CommentSection from '../components/CommentSection';
+import io from 'socket.io-client';
+import BookmarkButton from './BookmarkButton';
+import VoteButtons from './VoteButtons';
+import CommentSection from './CommentSection';
 
 function Insight({ insight, onEdit, onDelete, isProfile }) {
+  const [commentCount, setCommentCount] = useState(insight.commentCount || 0);
+
+  // Refresh insight data after comment actions
+  useEffect(() => {
+    const socket = io('http://localhost:5000', {
+      auth: { token: localStorage.getItem('token') },
+    });
+
+    socket.on('connect', () => {
+      console.log('Socket.IO connected');
+    });
+
+    socket.on('newComment', (data) => {
+      if (data.insightId === insight._id) {
+        handleCommentUpdate();
+      }
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket.IO connection error:', error);
+    });
+
+    const handleCommentUpdate = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/insights/${insight._id}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        if (!response.ok) throw new Error('Failed to fetch insight');
+        const updatedInsight = await response.json();
+        setCommentCount(updatedInsight.commentCount || 0);
+      } catch (error) {
+        console.error('Error refreshing insight:', error);
+      }
+    };
+
+    return () => {
+      socket.disconnect();
+      console.log('Socket.IO disconnected');
+    };
+  }, [insight._id]);
+
   const handleCopyLink = async () => {
     const url = `http://localhost:3000/insights/${insight._id}`;
     try {
@@ -13,7 +57,6 @@ function Insight({ insight, onEdit, onDelete, isProfile }) {
         await navigator.clipboard.writeText(url);
         toast.success('Link copied to clipboard!', { autoClose: 2000 });
       } else {
-        // Fallback for older browsers
         const textArea = document.createElement('textarea');
         textArea.value = url;
         document.body.appendChild(textArea);
@@ -81,18 +124,20 @@ function Insight({ insight, onEdit, onDelete, isProfile }) {
             </div>
           </div>
           <div className="d-flex align-items-center mb-3">
-            <img
-              src={insight.userId?.profilePicture || 'https://via.placeholder.com/40'}
-              className="rounded-circle me-2 img-fluid"
-              style={{ width: '30px', height: '30px', objectFit: 'cover' }}
-              alt="Author"
-              onError={(e) => {
-                console.log('Profile picture failed to load for insight:', insight._id);
-                e.target.src = 'https://via.placeholder.com/40';
-              }}
-            />
+            <Link to={`/profile/${insight.userId?._id}`}>
+              <img
+                src={insight.userId?.profilePicture || 'https://via.placeholder.com/40'}
+                className="rounded-circle me-2 img-fluid"
+                style={{ width: '30px', height: '30px', objectFit: 'cover' }}
+                alt="Author"
+                onError={(e) => {
+                  console.log('Profile picture failed to load for insight:', insight._id);
+                  e.target.src = 'https://via.placeholder.com/40';
+                }}
+              />
+            </Link>
             <small className="text-muted">
-              By {insight.userId?.username || 'Anonymous'} • {new Date(insight.createdAt).toLocaleDateString()}
+              By <Link to={`/profile/${insight.userId?._id}`} className="text-decoration-none text-muted">{insight.userId?.username || 'Anonymous'}</Link> • {new Date(insight.createdAt).toLocaleDateString()}
               {isProfile && ` • ${insight.visibility}`}
             </small>
           </div>
@@ -111,7 +156,7 @@ function Insight({ insight, onEdit, onDelete, isProfile }) {
             initialUpvotes={insight.upvotes || []}
             initialDownvotes={insight.downvotes || []}
           />
-          <small className="text-muted d-block mt-2">Comments: {insight.commentCount || 0}</small>
+          <small className="text-muted d-block mt-2">Comments: {commentCount}</small>
         </div>
         <div className="card-footer bg-transparent">
           <CommentSection insightId={insight._id} />

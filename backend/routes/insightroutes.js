@@ -4,10 +4,16 @@ const Insight = require('../models/Insight');
 const Comment = require('../models/Comment');
 const auth = require('../middleware/auth');
 
+// Initialize Socket.IO
+let io;
+router.setIo = (socketIo) => {
+  io = socketIo;
+};
+
 // Get user-specific insights
 router.get('/', auth, async (req, res) => {
   try {
-    const insights = await Insight.find({ userId: req.user.id }).populate('userId', 'username');
+    const insights = await Insight.find({ userId: req.user.id }).populate('userId', 'username profilePicture');
     res.json(insights);
   } catch (error) {
     console.error('Get user insights error:', error);
@@ -20,7 +26,7 @@ router.get('/public', async (req, res) => {
   try {
     const insights = await Insight.find({ visibility: 'public' })
       .sort({ createdAt: -1 })
-      .populate('userId', 'username');
+      .populate('userId', 'username profilePicture');
     res.json(insights);
   } catch (error) {
     console.error('Get public insights error:', error);
@@ -31,7 +37,7 @@ router.get('/public', async (req, res) => {
 // Get single insight by ID
 router.get('/:id', auth, async (req, res) => {
   try {
-    const insight = await Insight.findById(req.params.id).populate('userId', 'username');
+    const insight = await Insight.findById(req.params.id).populate('userId', 'username profilePicture');
     if (!insight) {
       return res.status(404).json({ message: 'Insight not found' });
     }
@@ -63,9 +69,10 @@ router.post('/', auth, async (req, res) => {
       userId: req.user.id,
       upvotes: [],
       downvotes: [],
+      commentCount: 0,
     });
     await insight.save();
-    const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username');
+    const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
     res.status(201).json(populatedInsight);
   } catch (error) {
     console.error('Create insight error:', error);
@@ -92,7 +99,7 @@ router.put('/:id', auth, async (req, res) => {
     }
     insight.visibility = visibility || insight.visibility;
     await insight.save();
-    const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username');
+    const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
     res.json(populatedInsight);
   } catch (error) {
     console.error('Update insight error:', error);
@@ -150,7 +157,7 @@ router.post('/:insightId/vote', auth, async (req, res) => {
       }
     }
     await insight.save();
-    const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username');
+    const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
     res.json({ message: 'Vote updated', insight: populatedInsight });
   } catch (error) {
     console.error('Vote insight error:', error);
@@ -188,7 +195,14 @@ router.post('/:insightId/comments', auth, async (req, res) => {
       userId: req.user.id,
     });
     await comment.save();
+    // Increment commentCount for both comments and replies
+    insight.commentCount = (insight.commentCount || 0) + 1;
+    await insight.save();
     const populatedComment = await Comment.findById(comment._id).populate('userId', 'username profilePicture');
+    io.emit('newComment', {
+      ...populatedComment.toObject(),
+      insightId: req.params.insightId,
+    });
     res.status(201).json(populatedComment);
   } catch (error) {
     console.error('Create comment error:', error);
@@ -251,8 +265,13 @@ router.delete('/comments/:commentId', auth, async (req, res) => {
     if (comment.userId.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
+    const replyCount = await Comment.countDocuments({ parentCommentId: req.params.commentId });
     await Comment.deleteMany({ parentCommentId: req.params.commentId });
     await Comment.deleteOne({ _id: req.params.commentId });
+    // Update commentCount
+    await Insight.findByIdAndUpdate(comment.insightId, {
+      $inc: { commentCount: -(1 + replyCount) },
+    });
     res.json({ message: 'Comment and replies deleted' });
   } catch (error) {
     console.error('Delete comment error:', error);

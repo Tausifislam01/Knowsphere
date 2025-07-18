@@ -4,8 +4,10 @@ Knowsphere/
 ├── project_documentation.txt
 ├── file_list.txt
 ├── backend/
+│   ├── .env
 │   ├── knowsphere-drive-key.json
 │   ├── package.json
+│   ├── package-lock.json
 │   ├── resetProfilePictures.js
 │   ├── server.js
 │   ├── config/
@@ -35,6 +37,7 @@ Knowsphere/
 │   └── uploads/
 └── frontend/
     ├── package.json
+    ├── package-lock.json
     ├── tailwind.config.js
     ├── public/
     │   ├── default-insight.png

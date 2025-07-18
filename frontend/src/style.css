@@ -1,6 +1,6 @@
 /* style.css */
 :root {
-  --navbar-bg: #000000;
+  --navbar-bg: #414040;
   --navbar-text: #ffffff;
   --button-bg: #000000;
   --button-text: #ffffff;
@@ -16,6 +16,8 @@
     rgba(255, 255, 255, 0) 51%,
     rgba(255, 255, 255, 0.1) 100%
   );
+  --glossy-button-bg: linear-gradient(45deg, #6b7280, #9ca3af);
+  --glossy-button-hover: linear-gradient(45deg, #4b5563, #7c8a9e);
 }
 
 /* Base styles */
@@ -30,10 +32,11 @@ body {
   background-color: var(--navbar-bg);
   background-image: var(--glossy-effect);
   color: var(--navbar-text);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.5);
 }
 
-.navbar-brand, .nav-link {
+.navbar-brand,
+.nav-link {
   color: var(--navbar-text) !important;
 }
 
@@ -43,8 +46,8 @@ body {
 
 /* Buttons */
 .glossy-button {
-  background: linear-gradient(45deg, #6b7280, #9ca3af);
-  color: white;
+  background: var(--glossy-button-bg);
+  color: var(--button-text);
   border: none;
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
@@ -55,31 +58,45 @@ body {
 }
 
 .glossy-button:hover {
-  background: linear-gradient(45deg, #4b5563, #7c8a9e);
+  background: var(--glossy-button-hover);
   transform: translateY(-1px);
 }
 
 .glossy-button i.bi {
   font-size: 1rem;
-  display: inline-block;
   line-height: 1;
 }
 
-.btn-outline-primary {
-  border-color: var(--button-text);
-  color: var(--button-text);
+/* Comment buttons */
+button.show-comments-btn,
+button.btn-outline-primary,
+button.btn-primary {
+  background: var(--glossy-button-bg) !important;
+  color: var(--button-text) !important;
+  border: 1px solid var(--button-text) !important;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  transition: all 0.3s ease;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  visibility: visible !important;
+  margin-bottom: 1rem;
+  z-index: 10;
 }
 
-.btn-outline-primary:hover {
-  background-color: var(--button-bg);
-  color: var(--button-text);
+button.show-comments-btn:hover,
+button.btn-outline-primary:hover,
+button.btn-primary:hover {
+  background: var(--glossy-button-hover) !important;
+  color: var(--button-text) !important;
+  border-color: var(--accent-light) !important;
+  transform: translateY(-1px);
 }
 
 /* Bootstrap Icons */
 .bi {
   font-family: 'bootstrap-icons' !important;
-  font-style: normal;
-  display: inline-block;
   line-height: 1;
 }
 
@@ -125,7 +142,7 @@ body {
   color: var(--button-text);
 }
 
-/* Ensure comment section is visible */
+/* Comment section */
 .comment-section {
   display: block !important;
   visibility: visible !important;
@@ -134,24 +151,7 @@ body {
   z-index: 10;
 }
 
-/* Ensure Show Comments button is visible */
-.show-comments-btn {
-  display: inline-block !important;
-  visibility: visible !important;
-  color: #ffffff !important;
-  background-color: transparent !important;
-  text-decoration: none;
-  padding: 0;
-  margin-bottom: 1rem;
-  z-index: 10;
-}
-
-.show-comments-btn:hover {
-  text-decoration: underline;
-  color: var(--accent-light) !important;
-}
-
-/* Fix card-footer in Home.js */
+/* Card footer */
 .card-footer.bg-transparent {
   background-color: transparent !important;
   border-top: none;
@@ -160,7 +160,7 @@ body {
   padding: 1rem;
 }
 
-/* Fix list-group-item in Profile.js */
+/* List group items */
 .list-group-item {
   background-color: var(--card-bg);
   color: var(--card-text);
@@ -169,16 +169,16 @@ body {
   padding: 1rem;
 }
 
-/* Fix btn-link for all buttons */
+/* Link buttons */
 .btn-link {
-  color: #ffffff !important;
+  color: var(--accent-light) !important;
   text-decoration: none;
   display: inline-block !important;
   visibility: visible !important;
 }
 
 .btn-link:hover {
-  color: var(--accent-light) !important;
+  color: var(--card-text) !important;
   text-decoration: underline;
 }
 
@@ -223,7 +223,7 @@ body {
   color: var(--card-text);
 }
 
-/* Comment Section Styles */
+/* Comment list */
 .comments-list {
   max-height: 500px;
   overflow-y: auto;
@@ -296,17 +296,7 @@ body {
   box-shadow: none;
 }
 
-/* Reply toggle buttons */
-.btn-link {
-  color: var(--accent-light);
-  text-decoration: none;
-}
-
-.btn-link:hover {
-  color: var(--card-text);
-}
-
-/* Scroll to top button transition */
+/* Scroll to top button */
 .scroll-top-button {
   transition: opacity 0.3s ease;
 }

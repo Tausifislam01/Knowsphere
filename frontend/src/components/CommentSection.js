@@ -58,7 +58,13 @@ function CommentSection({ insightId }) {
     // Socket.IO: Listen for new comments
     socket.on('newComment', (comment) => {
       if (comment.insightId === insightId) {
-        setComments((prevComments) => [...prevComments, comment]);
+        setComments((prevComments) => {
+          // Avoid duplicates by checking if comment already exists
+          if (!prevComments.some(c => c._id === comment._id)) {
+            return [...prevComments, comment];
+          }
+          return prevComments;
+        });
         toast.info('New comment added!', { autoClose: 2000 });
       }
     });
@@ -97,7 +103,7 @@ function CommentSection({ insightId }) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
       const addedComment = await response.json();
-      // Update comments via Socket.IO event, not here
+      // Update comments via Socket.IO event, so no need to add here
       parentCommentId ? setReplyText('') : setNewComment('');
       setReplyingTo(null);
       setError('');
@@ -385,7 +391,7 @@ function CommentSection({ insightId }) {
           onClick={() => setShowComments(true)}
         >
           <i className="bi bi-chat-left-text me-1"></i>
-          Show Comments ({topLevelComments.length})
+          Show Comments
         </button>
       ) : (
         <div>
@@ -445,15 +451,15 @@ function CommentSection({ insightId }) {
                 </div>
               )}
               {token && topLevelComments.length > displayedComments && (
-                <div className="mt-2">
+                <div className="mt-2 d-flex gap-2">
                   <button
-                    className="btn btn-link btn-sm me-2"
+                    className="btn btn-outline-primary btn-sm"
                     onClick={handleShowMore}
                   >
                     Load More Comments
                   </button>
                   <button
-                    className="btn btn-link btn-sm"
+                    className="btn btn-outline-primary btn-sm"
                     onClick={handleLoadAll}
                   >
                     Load All Comments

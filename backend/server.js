@@ -28,22 +28,21 @@ io.use((socket, next) => {
   if (!token) {
     return next(new Error('Authentication error'));
   }
-  // Assume JWT verification (uncomment and configure with your JWT secret)
-  // const jwt = require('jsonwebtoken');
-  // jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-  //   if (err) return next(new Error('Authentication error'));
-  //   socket.user = decoded;
-  //   next();
-  // });
-  next(); // Temporary bypass for testing
+  const jwt = require('jsonwebtoken');
+  jwt.verify(token, process.env.JWT_SECRET || 'your_default_secret', (err, decoded) => {
+    if (err) {
+      console.error('Socket.IO auth error:', err.message); // Silent logging for debugging
+      return next(new Error('Authentication error'));
+    }
+    socket.user = decoded;
+    next();
+  });
 });
 
 // Socket.IO Connection
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
+  // Removed console.log for user connect/disconnect
+  socket.on('disconnect', () => {});
 });
 
 // Routes
@@ -55,40 +54,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/insights', insightRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 
-// Example comment creation route (replace with actual route in insightroutes.js)
-app.post('/api/insights/:id/comments', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { text, parentCommentId } = req.body;
-    // Assume JWT middleware sets req.user
-    // const userId = req.user.id;
-
-    // Mock comment creation (replace with actual DB logic)
-    const comment = {
-      _id: Date.now().toString(),
-      insightId: id,
-      userId: {
-        _id: 'user123', // Replace with req.user.id
-        username: 'testuser',
-        profilePicture: 'https://via.placeholder.com/40', // Replace with actual user data
-      },
-      text,
-      parentCommentId: parentCommentId || null,
-      createdAt: new Date(),
-    };
-
-    // Save to DB (replace with actual logic, e.g., Comment.create(comment))
-    console.log('Saving comment:', comment);
-
-    // Emit to all clients
-    io.emit('newComment', comment);
-
-    res.status(201).json(comment);
-  } catch (error) {
-    console.error('Comment creation error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+// Pass Socket.IO to insightroutes
+insightRoutes.setIo(io);
 
 // Default 404 handler
 app.use((req, res) => {
