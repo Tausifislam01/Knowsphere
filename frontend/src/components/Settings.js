@@ -59,6 +59,7 @@ function Settings() {
       if (response.ok) {
         setSuccess('Password changed successfully');
         setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setTimeout(() => navigate('/login'), 2000); // Redirect to login after 2s
       } else {
         setError(data.message || 'Failed to change password');
       }

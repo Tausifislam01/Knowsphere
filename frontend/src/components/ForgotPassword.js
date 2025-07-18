@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -33,6 +33,7 @@ function ForgotPassword() {
       const data = await response.json();
       if (response.ok) {
         setSuccess('Password reset instructions sent to your email');
+        setTimeout(() => navigate('/login'), 2000); // Redirect to login after 2s
       } else {
         setError(data.message || 'Failed to send reset instructions');
       }
@@ -109,9 +110,9 @@ function ForgotPassword() {
                 <div className="text-center mt-4">
                   <p className="mb-0">
                     Back to{' '}
-                    <a href="/login" className="text-decoration-none fw-semibold">
+                    <Link to="/login" className="text-decoration-none fw-semibold">
                       Log in
-                    </a>
+                    </Link>
                   </p>
                 </div>
               </div>

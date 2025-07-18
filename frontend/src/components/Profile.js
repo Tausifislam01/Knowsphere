@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import BookmarkButton from './BookmarkButton';
-import VoteButtons from './VoteButtons';
-import CommentSection from './CommentSection';
+import Insight from './Insight';
 
 function Profile() {
   const [user, setUser] = useState(null);
@@ -108,7 +106,6 @@ function Profile() {
   return (
     <div className="container-fluid py-4">
       <div className="row g-4">
-        {/* Profile Section (Left, 25%) */}
         <div className="col-lg-3">
           <div className="card glossy-card h-100">
             <div className="card-body d-flex flex-column align-items-center py-4">
@@ -116,11 +113,7 @@ function Profile() {
                 src={user.profilePicture || 'https://via.placeholder.com/150'}
                 className="rounded-circle border border-4 border-light shadow mb-3"
                 alt="Profile"
-                style={{
-                  width: '150px',
-                  height: '150px',
-                  objectFit: 'cover',
-                }}
+                style={{ width: '150px', height: '150px', objectFit: 'cover' }}
                 onError={(e) => (e.target.src = 'https://via.placeholder.com/150')}
               />
               <h4 className="card-title mb-1">{user.fullName || user.username}</h4>
@@ -190,8 +183,6 @@ function Profile() {
             </div>
           </div>
         </div>
-
-        {/* Main Content (Center, 50%) */}
         <div className="col-lg-6">
           <div className="card glossy-card h-100">
             <div className="card-body">
@@ -218,69 +209,19 @@ function Profile() {
               ) : (
                 <div className="list-group list-group-flush">
                   {insights.map((insight) => (
-                    <div key={insight._id} id={`insight-${insight._id}`} className="list-group-item border-0 py-3 px-0">
-                      <div className="d-flex align-items-start mb-2">
-                        <div className="flex-grow-1">
-                          <h5 className="mb-1">{insight.title}</h5>
-                          <p className="mb-2 text-muted">{insight.body}</p>
-                          <small className="text-muted">Visibility: {insight.visibility}</small>
-                        </div>
-                        <div className="ms-2 d-flex align-items-center">
-                          <BookmarkButton insightId={insight._id} />
-                          <div className="dropdown ms-2">
-                            <button
-                              className="glossy-button btn-sm"
-                              type="button"
-                              data-bs-toggle="dropdown"
-                              aria-expanded="false"
-                            >
-                              <i className="bi bi-three-dots"></i>
-                            </button>
-                            <ul className="dropdown-menu">
-                              <li>
-                                <button
-                                  className="dropdown-item"
-                                  onClick={() => handleEditInsight(insight._id)}
-                                >
-                                  <i className="bi bi-pencil me-2"></i> Edit
-                                </button>
-                              </li>
-                              <li>
-                                <button
-                                  className="dropdown-item text-danger"
-                                  onClick={() => handleDeleteInsight(insight._id)}
-                                >
-                                  <i className="bi bi-trash me-2"></i> Delete
-                                </button>
-                              </li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                      {insight.tags && (
-                        <div className="d-flex flex-wrap gap-2 mb-2">
-                          {insight.tags.split(',').map((tag, index) => (
-                            <span key={index} className="badge bg-light text-dark">
-                              #{tag.trim()}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <VoteButtons
-                        insightId={insight._id}
-                        initialUpvotes={insight.upvotes || []}
-                        initialDownvotes={insight.downvotes || []}
-                      />
-                      <CommentSection insightId={insight._id} />
-                    </div>
+                    <Insight
+                      key={insight._id}
+                      insight={insight}
+                      onEdit={handleEditInsight}
+                      onDelete={handleDeleteInsight}
+                      isProfile={true}
+                    />
                   ))}
                 </div>
               )}
             </div>
           </div>
         </div>
-
-        {/* Sidebar (Right, 25%) */}
         <div className="col-lg-3">
           <div className="card glossy-card h-100">
             <div className="card-body">
@@ -383,8 +324,6 @@ function Profile() {
           </div>
         </div>
       </div>
-
-      {/* Error Toast */}
       {error && (
         <div className="toast show position-fixed bottom-0 end-0 m-3" role="alert">
           <div className="toast-header bg-danger text-white">
@@ -398,8 +337,6 @@ function Profile() {
           <div className="toast-body">{error}</div>
         </div>
       )}
-
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog">

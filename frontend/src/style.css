@@ -7,8 +7,8 @@
   --button-hover: #333333;
   --card-bg: #1a1a1a;
   --card-text: #ffffff;
-  --accent-light: #cccccc; /* Added to fix undefined variable */
-  --danger: #dc3545; /* Added for text-danger consistency */
+  --accent-light: #cccccc;
+  --danger: #dc3545;
   --glossy-effect: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0.2) 0%,
@@ -43,19 +43,26 @@ body {
 
 /* Buttons */
 .glossy-button {
-  background-color: var(--button-bg);
-  background-image: var(--glossy-effect);
-  color: var(--button-text);
+  background: linear-gradient(45deg, #6b7280, #9ca3af);
+  color: white;
   border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
   transition: all 0.3s ease;
-  padding: 8px 16px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .glossy-button:hover {
-  background-color: var(--button-hover);
+  background: linear-gradient(45deg, #4b5563, #7c8a9e);
   transform: translateY(-1px);
-  color: var(--button-text);
+}
+
+.glossy-button i.bi {
+  font-size: 1rem;
+  display: inline-block;
+  line-height: 1;
 }
 
 .btn-outline-primary {
@@ -64,6 +71,56 @@ body {
 }
 
 .btn-outline-primary:hover {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+}
+
+/* Bootstrap Icons */
+.bi {
+  font-family: 'bootstrap-icons' !important;
+  font-style: normal;
+  display: inline-block;
+  line-height: 1;
+}
+
+/* Dropdown */
+.dropdown-menu {
+  z-index: 1000;
+  min-width: 10rem;
+  background: var(--card-bg);
+  color: var(--card-text);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown-item {
+  color: var(--card-text);
+  padding: 0.25rem 1rem;
+}
+
+.dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--accent-light);
+}
+
+/* Images */
+.rounded-circle {
+  display: block !important;
+  visibility: visible !important;
+  object-fit: cover;
+}
+
+/* Toast */
+.custom-toast-container {
+  z-index: 1050;
+}
+
+.toast {
+  background-color: var(--card-bg);
+  color: var(--card-text);
+}
+
+.toast-header {
   background-color: var(--button-bg);
   color: var(--button-text);
 }
@@ -164,17 +221,6 @@ body {
 .modal-content {
   background-color: var(--card-bg);
   color: var(--card-text);
-}
-
-/* Toast */
-.toast {
-  background-color: var(--card-bg);
-  color: var(--card-text);
-}
-
-.error-toast {
-  background-color: var(--danger);
-  color: white;
 }
 
 /* Comment Section Styles */

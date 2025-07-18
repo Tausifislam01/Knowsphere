@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import { toast } from 'react-toastify';
 
 const BACKEND_URL = 'http://localhost:5000';
+const socket = io(BACKEND_URL, {
+  auth: { token: localStorage.getItem('token') },
+});
 
 function CommentSection({ insightId }) {
   const [comments, setComments] = useState([]);
@@ -28,13 +33,11 @@ function CommentSection({ insightId }) {
         const response = await fetch(`${BACKEND_URL}/api/insights/${insightId}/comments`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        
         if (!response.ok) {
           const text = await response.text();
           console.log('Fetch comments response:', { status: response.status, body: text });
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
         const data = await response.json();
         console.log('Fetched comments:', data);
         setComments(data);
@@ -45,12 +48,25 @@ function CommentSection({ insightId }) {
         setIsLoading(false);
       }
     };
-    
+
     if (insightId && showComments && token) {
       fetchComments();
     } else if (showComments && !token) {
       setShowAuthModal(true);
     }
+
+    // Socket.IO: Listen for new comments
+    socket.on('newComment', (comment) => {
+      if (comment.insightId === insightId) {
+        setComments((prevComments) => [...prevComments, comment]);
+        toast.info('New comment added!', { autoClose: 2000 });
+      }
+    });
+
+    // Cleanup
+    return () => {
+      socket.off('newComment');
+    };
   }, [insightId, showComments, token]);
 
   const handleAddComment = async (e, parentCommentId = null) => {
@@ -75,15 +91,13 @@ function CommentSection({ insightId }) {
         },
         body: JSON.stringify({ text, parentCommentId }),
       });
-      
       if (!response.ok) {
         const data = await response.json();
         console.log('Add comment response:', { status: response.status, data });
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
-      
       const addedComment = await response.json();
-      setComments([...comments, addedComment]);
+      // Update comments via Socket.IO event, not here
       parentCommentId ? setReplyText('') : setNewComment('');
       setReplyingTo(null);
       setError('');
@@ -117,15 +131,13 @@ function CommentSection({ insightId }) {
         },
         body: JSON.stringify({ text: editText }),
       });
-      
       if (!response.ok) {
         const data = await response.json();
         console.log('Edit comment response:', { status: response.status, data });
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
-      
       const updatedComment = await response.json();
-      setComments(comments.map(comment => 
+      setComments(comments.map(comment =>
         comment._id === commentId ? updatedComment : comment
       ));
       setEditingCommentId(null);
@@ -145,20 +157,18 @@ function CommentSection({ insightId }) {
       return;
     }
     if (!window.confirm('Are you sure you want to delete this comment?')) return;
-    
+
     setIsLoading(true);
     try {
       const response = await fetch(`${BACKEND_URL}/api/insights/comments/${commentId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
-      
       if (!response.ok) {
         const data = await response.json();
         console.log('Delete comment response:', { status: response.status, data });
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
-      
       setComments(comments.filter(comment => comment._id !== commentId));
     } catch (error) {
       console.error('Delete comment error:', error);
@@ -223,7 +233,7 @@ function CommentSection({ insightId }) {
       insightElement.scrollIntoView({ behavior: 'smooth' });
     } else {
       console.warn(`Insight element with ID 'insight-${insightId}' not found.`);
-      console.log('Available insight IDs in DOM:', 
+      console.log('Available insight IDs in DOM:',
         Array.from(document.querySelectorAll('[id^="insight-"]')).map(el => el.id));
       setError('Unable to scroll to insight: Post not found.');
     }
@@ -244,10 +254,13 @@ function CommentSection({ insightId }) {
             <div className="d-flex">
               <img
                 src={comment.userId?.profilePicture || 'https://via.placeholder.com/40'}
-                className="rounded-circle me-3"
-                width="40"
-                height="40"
+                className="rounded-circle me-3 img-fluid"
+                style={{ width: '40px', height: '40px', objectFit: 'cover' }}
                 alt="User"
+                onError={(e) => {
+                  console.log('Comment profile picture failed to load for comment:', comment._id);
+                  e.target.src = 'https://via.placeholder.com/40';
+                }}
               />
               <div className="flex-grow-1">
                 <div className="d-flex justify-content-between align-items-center mb-1">
@@ -260,24 +273,25 @@ function CommentSection({ insightId }) {
                   </div>
                   {userId === comment.userId?._id && (
                     <div className="dropdown">
-                      <button 
-                        className="btn btn-sm btn-link text-muted p-0" 
+                      <button
+                        className="btn btn-sm btn-link text-muted p-0"
                         data-bs-toggle="dropdown"
+                        onClick={() => console.log(`Comment dropdown clicked for comment ${comment._id}`)}
                       >
                         <i className="bi bi-three-dots"></i>
                       </button>
                       <ul className="dropdown-menu">
                         <li>
-                          <button 
-                            className="dropdown-item" 
+                          <button
+                            className="dropdown-item"
                             onClick={() => handleEditClick(comment._id, comment.text)}
                           >
                             <i className="bi bi-pencil me-2"></i> Edit
                           </button>
                         </li>
                         <li>
-                          <button 
-                            className="dropdown-item text-danger" 
+                          <button
+                            className="dropdown-item text-danger"
                             onClick={() => handleDeleteComment(comment._id)}
                           >
                             <i className="bi bi-trash me-2"></i> Delete
@@ -287,12 +301,10 @@ function CommentSection({ insightId }) {
                     </div>
                   )}
                 </div>
-                
                 {editingCommentId === comment._id ? (
                   <form onSubmit={(e) => handleEditComment(e, comment._id)} className="mt-2">
                     <textarea
                       className="form-control mb-2"
-                      style={{ backgroundColor: 'white', color: 'black' }}
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
                       rows="3"
@@ -326,7 +338,6 @@ function CommentSection({ insightId }) {
                     </div>
                   </>
                 )}
-                
                 {hasReplies && (
                   <button
                     className="btn btn-link text-muted p-0 mt-1"
@@ -335,12 +346,10 @@ function CommentSection({ insightId }) {
                     {showReplies[comment._id] ? `Hide Replies (${replyCount})` : `See Replies (${replyCount})`}
                   </button>
                 )}
-                
                 {replyingTo === comment._id && (
                   <form onSubmit={(e) => handleAddComment(e, comment._id)} className="mt-3">
                     <textarea
                       className="form-control mb-2"
-                      style={{ backgroundColor: 'white', color: 'black' }}
                       value={replyText}
                       onChange={(e) => setReplyText(e.target.value)}
                       placeholder="Write your reply..."
@@ -360,7 +369,6 @@ function CommentSection({ insightId }) {
                     </div>
                   </form>
                 )}
-                
                 {showReplies[comment._id] && buildCommentTree(comments, comment._id, depth + 1)}
               </div>
             </div>
@@ -370,14 +378,14 @@ function CommentSection({ insightId }) {
   };
 
   return (
-    <div className="mt-3">
+    <div className="mt-3 comment-section">
       {!showComments ? (
         <button
-          className="btn btn-outline-primary btn-sm"
+          className="btn btn-outline-primary btn-sm show-comments-btn"
           onClick={() => setShowComments(true)}
         >
           <i className="bi bi-chat-left-text me-1"></i>
-          Show Comments
+          Show Comments ({topLevelComments.length})
         </button>
       ) : (
         <div>
@@ -404,7 +412,7 @@ function CommentSection({ insightId }) {
             <>
               <div className="mb-3">
                 <textarea
-                  className="form-control"
+                  className="form-control comment-input"
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Write a comment..."
@@ -416,19 +424,17 @@ function CommentSection({ insightId }) {
                     {topLevelComments.length} {topLevelComments.length === 1 ? 'comment' : 'comments'}
                   </small>
                   <button
-                    className="btn btn-primary btn-sm"
+                    className="glossy-button btn-sm"
                     onClick={handleAddComment}
-                    disabled={!newComment.trim() || !token}
+                    disabled={!newComment.trim() || !token || isLoading}
                   >
                     Post Comment
                   </button>
                 </div>
               </div>
-              
               {error && (
                 <div className="alert alert-danger py-2">{error}</div>
               )}
-
               {token ? (
                 <div className="comments-list">
                   {buildCommentTree(comments, null, 0, true)}
@@ -438,7 +444,6 @@ function CommentSection({ insightId }) {
                   Please log in or sign up to view comments.
                 </div>
               )}
-
               {token && topLevelComments.length > displayedComments && (
                 <div className="mt-2">
                   <button
@@ -455,7 +460,6 @@ function CommentSection({ insightId }) {
                   </button>
                 </div>
               )}
-
               <button
                 className="btn btn-secondary btn-sm mt-3"
                 onClick={handleScrollToInsight}
@@ -466,8 +470,6 @@ function CommentSection({ insightId }) {
           )}
         </div>
       )}
-
-      {/* Authentication Modal */}
       <div
         className={`modal fade ${showAuthModal ? 'show d-block' : ''}`}
         tabIndex="-1"

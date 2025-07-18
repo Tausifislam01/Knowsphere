@@ -1,5 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import Navbar from './components/Navbar';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Profile from './components/Profile';
@@ -13,37 +16,10 @@ import './style.css';
 import './index.css';
 
 function App() {
-  const isAuthenticated = !!localStorage.getItem('token');
-
   return (
     <Router>
       <div className="min-h-screen bg-gray-900">
-        <nav className="glossy-navbar navbar navbar-expand-lg navbar-dark sticky-top">
-          <div className="container-fluid">
-            <a className="navbar-brand" href="/">KnowSphere</a>
-            <div className="navbar-nav">
-              <a className="nav-link" href="/">Home</a>
-              {isAuthenticated ? (
-                <>
-                  <a className="nav-link" href="/profile">Profile</a>
-                  <a className="nav-link" href="/bookmarks">Bookmarks</a>
-                  <a className="nav-link" href="/settings">Settings</a>
-                  <a className="nav-link" href="/login" onClick={() => {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('userId');
-                  }}>
-                    Logout
-                  </a>
-                </>
-              ) : (
-                <>
-                  <a className="nav-link" href="/login">Login</a>
-                  <a className="nav-link" href="/signup">Signup</a>
-                </>
-              )}
-            </div>
-          </div>
-        </nav>
+        <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -56,6 +32,13 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/bookmarks" element={<Bookmarks />} />
         </Routes>
+        <ToastContainer
+          position="top-right"
+          autoClose={2000}
+          hideProgressBar
+          theme="dark"
+          className="custom-toast-container"
+        />
       </div>
     </Router>
   );

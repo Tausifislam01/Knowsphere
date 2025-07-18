@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import BookmarkButton from '../components/BookmarkButton';
-import VoteButtons from '../components/VoteButtons';
-import CommentSection from '../components/CommentSection';
+import Insight from '../components/Insight';
 
 function Bookmarks() {
   const [bookmarks, setBookmarks] = useState([]);
@@ -68,44 +66,10 @@ function Bookmarks() {
       ) : (
         <div className="row g-4">
           {bookmarks.map((bookmark) => (
-            <div key={bookmark._id} id={`insight-${bookmark.insightId._id}`} className="col-md-6 col-lg-4">
-              <div className="card glossy-card h-100">
-                <div className="card-body">
-                  <h5 className="card-title">{bookmark.insightId.title}</h5>
-                  <p className="card-text text-muted">{bookmark.insightId.body}</p>
-                  <div className="d-flex align-items-center mb-3">
-                    <img
-                      src={bookmark.insightId.userId?.profilePicture || 'https://via.placeholder.com/40'}
-                      className="rounded-circle me-2"
-                      width="30"
-                      height="30"
-                      alt="Author"
-                    />
-                    <small className="text-muted">
-                      By {bookmark.insightId.userId?.username || 'Anonymous'} • {new Date(bookmark.insightId.createdAt).toLocaleDateString()}
-                    </small>
-                  </div>
-                  {bookmark.insightId.tags && (
-                    <div className="d-flex flex-wrap gap-2 mb-3">
-                      {bookmark.insightId.tags.split(',').map((tag, index) => (
-                        <span key={index} className="badge bg-light text-dark">
-                          #{tag.trim()}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <BookmarkButton insightId={bookmark.insightId._id} />
-                  <VoteButtons
-                    insightId={bookmark.insightId._id}
-                    initialUpvotes={bookmark.insightId.upvotes || []}
-                    initialDownvotes={bookmark.insightId.downvotes || []}
-                  />
-                </div>
-                <div className="card-footer bg-transparent">
-                  <CommentSection insightId={bookmark.insightId._id} />
-                </div>
-              </div>
-            </div>
+            <Insight
+              key={bookmark._id}
+              insight={bookmark.insightId}
+            />
           ))}
         </div>
       )}
