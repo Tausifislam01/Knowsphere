@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Insight from '../components/Insight';
@@ -10,8 +11,34 @@ function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
+  const [showFollowed, setShowFollowed] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
+    // Fetch current user
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/auth/profile', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        if (response.ok) {
+          const user = await response.json();
+          setCurrentUser(user);
+        }
+      } catch (error) {
+        console.error('Fetch user error:', error);
+      }
+    };
+    fetchCurrentUser();
+
+    // Handle user updates
+    const handleUserUpdate = (event) => {
+      setCurrentUser(event.detail);
+    };
+    window.addEventListener('userUpdated', handleUserUpdate);
+
     if (id) {
       const fetchSingleInsight = async () => {
         setIsLoading(true);
@@ -37,17 +64,24 @@ function Home() {
       };
       fetchSingleInsight();
     } else {
-      const fetchPublicInsights = async () => {
+      const fetchInsights = async () => {
         setIsLoading(true);
         try {
-          const response = await fetch('http://localhost:5000/api/insights/public');
+          const endpoint = showFollowed
+            ? 'http://localhost:5000/api/insights/followed'
+            : 'http://localhost:5000/api/insights/public';
+          const response = await fetch(endpoint, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+          });
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
           const data = await response.json();
           setInsights(data);
         } catch (error) {
-          console.error('Fetch public insights error:', error);
+          console.error('Fetch insights error:', error);
           setError(error.message.includes('Failed to fetch')
             ? 'Unable to connect to the server. Please try again later.'
             : `Error: ${error.message}`);
@@ -55,15 +89,19 @@ function Home() {
           setIsLoading(false);
         }
       };
-      fetchPublicInsights();
+      fetchInsights();
     }
-  }, [id]);
+
+    return () => {
+      window.removeEventListener('userUpdated', handleUserUpdate);
+    };
+  }, [id, showFollowed]);
 
   const filteredInsights = insights.filter(insight => {
     const matchesSearch = insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         insight.body.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = selectedTag ?
-      insight.tags && insight.tags.split(',').map(t => t.trim().toLowerCase()).includes(selectedTag.toLowerCase())
+                        insight.body.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTag = selectedTag
+      ? insight.tags && insight.tags.split(',').map(t => t.trim().toLowerCase()).includes(selectedTag.toLowerCase())
       : true;
     return matchesSearch && matchesTag;
   });
@@ -148,7 +186,13 @@ function Home() {
             <div>
               <span className="fw-bold">{filteredInsights.length}</span> insights found
             </div>
-            <div>
+            <div className="d-flex gap-2">
+              <button
+                className={`glossy-button btn btn-sm ${showFollowed ? 'bg-primary' : 'bg-secondary'}`}
+                onClick={() => setShowFollowed(!showFollowed)}
+              >
+                {showFollowed ? 'Show All Insights' : 'Show Followed Insights'}
+              </button>
               <Link to="/insights/new" className="glossy-button btn btn-sm">
                 <i className="bi bi-plus-lg me-2"></i>
                 Create New Insight
@@ -188,6 +232,7 @@ function Home() {
                 <Insight
                   key={insight._id}
                   insight={insight}
+                  currentUser={currentUser}
                 />
               ))}
             </div>

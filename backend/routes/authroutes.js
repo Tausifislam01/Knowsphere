@@ -1,3 +1,4 @@
+
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -51,7 +52,8 @@ router.post('/signup', async (req, res) => {
       email, 
       password, 
       followers: [], 
-      following: [] 
+      following: [], 
+      followedTags: [] 
     });
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
@@ -89,7 +91,10 @@ router.post('/login', async (req, res) => {
 // Get Profile
 router.get('/profile', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user.id)
+      .select('-password')
+      .populate('followers', 'username profilePicture')
+      .populate('following', 'username profilePicture');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -290,7 +295,10 @@ router.post('/follow/:userId', auth, async (req, res) => {
     await currentUser.save();
     await userToFollow.save();
 
-    const updatedUser = await User.findById(req.user.id).select('-password');
+    const updatedUser = await User.findById(req.user.id)
+      .select('-password')
+      .populate('followers', 'username profilePicture')
+      .populate('following', 'username profilePicture');
     res.json({ message: 'User followed', user: updatedUser });
   } catch (error) {
     console.error('Follow user error:', error);
@@ -321,10 +329,67 @@ router.post('/unfollow/:userId', auth, async (req, res) => {
     await currentUser.save();
     await userToUnfollow.save();
 
-    const updatedUser = await User.findById(req.user.id).select('-password');
+    const updatedUser = await User.findById(req.user.id)
+      .select('-password')
+      .populate('followers', 'username profilePicture')
+      .populate('following', 'username profilePicture');
     res.json({ message: 'User unfollowed', user: updatedUser });
   } catch (error) {
     console.error('Unfollow user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Follow a tag
+router.post('/follow-tag/:tag', auth, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const tag = req.params.tag.trim().toLowerCase();
+    if (currentUser.followedTags.includes(tag)) {
+      return res.status(400).json({ message: 'Already following this tag' });
+    }
+
+    currentUser.followedTags.push(tag);
+    await currentUser.save();
+
+    const updatedUser = await User.findById(req.user.id)
+      .select('-password')
+      .populate('followers', 'username profilePicture')
+      .populate('following', 'username profilePicture');
+    res.json({ message: 'Tag followed', user: updatedUser });
+  } catch (error) {
+    console.error('Follow tag error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Unfollow a tag
+router.post('/unfollow-tag/:tag', auth, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const tag = req.params.tag.trim().toLowerCase();
+    if (!currentUser.followedTags.includes(tag)) {
+      return res.status(400).json({ message: 'Not following this tag' });
+    }
+
+    currentUser.followedTags = currentUser.followedTags.filter(
+      (t) => t !== tag
+    );
+    await currentUser.save();
+
+    const updatedUser = await User.findById(req.user.id)
+      .select('-password')
+      .populate('followers', 'username profilePicture')
+      .populate('following', 'username profilePicture');
+    res.json({ message: 'Tag unfollowed', user: updatedUser });
+  } catch (error) {
+    console.error('Unfollow tag error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

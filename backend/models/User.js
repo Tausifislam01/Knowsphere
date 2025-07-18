@@ -25,6 +25,9 @@ const UserSchema = new mongoose.Schema({
   recentActivity: { type: [String], default: [] },
   preferredTopics: { type: [String], default: [] },
   genderPrivacy: { type: Boolean, default: false },
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }],
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }],
+  followedTags: [{ type: String, default: [] }],
   createdAt: { type: Date, default: Date.now },
 });
 

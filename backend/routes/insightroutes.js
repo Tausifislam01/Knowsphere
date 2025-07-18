@@ -1,7 +1,9 @@
+// backend/routes/insightroutes.js
 const express = require('express');
 const router = express.Router();
 const Insight = require('../models/Insight');
 const Comment = require('../models/Comment');
+const User = require('../models/User');
 const auth = require('../middleware/auth');
 
 // Initialize Socket.IO
@@ -34,6 +36,30 @@ router.get('/public', async (req, res) => {
   }
 });
 
+// Get followed insights
+router.get('/followed', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const followedUsers = user.following || [];
+    const followedTags = user.followedTags || [];
+    const insights = await Insight.find({
+      $or: [
+        { userId: { $in: followedUsers }, visibility: { $in: ['public', 'followers'] } },
+        { tags: { $regex: followedTags.join('|'), $options: 'i' }, visibility: 'public' },
+      ],
+    })
+      .populate('userId', 'username profilePicture')
+      .sort({ createdAt: -1 });
+    res.json(insights);
+  } catch (error) {
+    console.error('Get followed insights error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get single insight by ID
 router.get('/:id', auth, async (req, res) => {
   try {
@@ -47,6 +73,19 @@ router.get('/:id', auth, async (req, res) => {
     res.json(insight);
   } catch (error) {
     console.error('Get insight error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get insights by user ID
+router.get('/user/:userId', auth, async (req, res) => {
+  try {
+    const insights = await Insight.find({ userId: req.params.userId })
+      .populate('userId', 'username profilePicture')
+      .sort({ createdAt: -1 });
+    res.json(insights);
+  } catch (error) {
+    console.error('Get user insights error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -195,7 +234,6 @@ router.post('/:insightId/comments', auth, async (req, res) => {
       userId: req.user.id,
     });
     await comment.save();
-    // Increment commentCount for both comments and replies
     insight.commentCount = (insight.commentCount || 0) + 1;
     await insight.save();
     const populatedComment = await Comment.findById(comment._id).populate('userId', 'username profilePicture');
@@ -268,7 +306,6 @@ router.delete('/comments/:commentId', auth, async (req, res) => {
     const replyCount = await Comment.countDocuments({ parentCommentId: req.params.commentId });
     await Comment.deleteMany({ parentCommentId: req.params.commentId });
     await Comment.deleteOne({ _id: req.params.commentId });
-    // Update commentCount
     await Insight.findByIdAndUpdate(comment.insightId, {
       $inc: { commentCount: -(1 + replyCount) },
     });

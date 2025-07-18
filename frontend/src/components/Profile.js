@@ -1,9 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Insight from './Insight';
+import FollowButton from './FollowButton';
 
 function Profile() {
+  const { userId } = useParams();
   const [user, setUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [insights, setInsights] = useState([]);
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -14,7 +18,22 @@ function Profile() {
   useEffect(() => {
     const fetchProfileAndInsights = async () => {
       try {
-        const profileResponse = await fetch('http://localhost:5000/api/auth/profile', {
+        // Fetch current user
+        const currentUserResponse = await fetch('http://localhost:5000/api/auth/profile', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        if (currentUserResponse.ok) {
+          const currentUserData = await currentUserResponse.json();
+          setCurrentUser(currentUserData);
+        }
+
+        // Fetch profile (own or another user's)
+        const profileUrl = userId
+          ? `http://localhost:5000/api/auth/profile/${userId}`
+          : 'http://localhost:5000/api/auth/profile';
+        const profileResponse = await fetch(profileUrl, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -28,11 +47,17 @@ function Profile() {
         setUser(profileData);
         localStorage.setItem('userId', profileData._id);
 
-        const insightsResponse = await fetch('http://localhost:5000/api/insights', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
+        // Fetch insights
+        const insightsResponse = await fetch(
+          userId
+            ? `http://localhost:5000/api/insights/user/${userId}`
+            : 'http://localhost:5000/api/insights',
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+          }
+        );
         const insightsData = await insightsResponse.json();
         if (insightsResponse.ok) {
           setInsights(insightsData);
@@ -44,8 +69,21 @@ function Profile() {
         navigate('/login');
       }
     };
+
+    const handleUserUpdate = (event) => {
+      setCurrentUser(event.detail);
+      if (!userId || userId === event.detail._id) {
+        setUser(event.detail);
+      }
+    };
+    window.addEventListener('userUpdated', handleUserUpdate);
+
     fetchProfileAndInsights();
-  }, [navigate]);
+
+    return () => {
+      window.removeEventListener('userUpdated', handleUserUpdate);
+    };
+  }, [navigate, userId]);
 
   const handleDeleteProfile = async (e) => {
     e.preventDefault();
@@ -118,6 +156,9 @@ function Profile() {
               />
               <h4 className="card-title mb-1">{user.fullName || user.username}</h4>
               <p className="text-muted mb-3">{user.bio || 'No bio available'}</p>
+              {userId && userId !== currentUser?._id && (
+                <FollowButton userId={userId} currentUser={currentUser} />
+              )}
               <div className="w-100 px-3 mb-3">
                 <div className="d-flex align-items-center mb-2">
                   <i className="bi bi-envelope me-2 text-primary"></i>
@@ -166,20 +207,24 @@ function Profile() {
                   </div>
                 )}
               </div>
-              <button
-                className="glossy-button mt-auto w-75"
-                onClick={() => navigate('/edit-profile')}
-              >
-                <i className="bi bi-pencil-square me-2"></i>
-                Edit Profile
-              </button>
-              <button
-                className="glossy-button mt-2 w-75 bg-danger hover:bg-danger-dark"
-                onClick={() => setShowDeleteModal(true)}
-              >
-                <i className="bi bi-trash me-2"></i>
-                Delete Profile
-              </button>
+              {(!userId || userId === currentUser?._id) && (
+                <>
+                  <button
+                    className="glossy-button mt-auto w-75"
+                    onClick={() => navigate('/edit-profile')}
+                  >
+                    <i className="bi bi-pencil-square me-2"></i>
+                    Edit Profile
+                  </button>
+                  <button
+                    className="glossy-button mt-2 w-75 bg-danger hover:bg-danger-dark"
+                    onClick={() => setShowDeleteModal(true)}
+                  >
+                    <i className="bi bi-trash me-2"></i>
+                    Delete Profile
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -188,12 +233,14 @@ function Profile() {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-4">
                 <h3 className="mb-0">Your Insights</h3>
-                <button
-                  className="glossy-button btn-sm"
-                  onClick={() => navigate('/insights/new')}
-                >
-                  <i className="bi bi-plus-lg me-1"></i> New
-                </button>
+                {(!userId || userId === currentUser?._id) && (
+                  <button
+                    className="glossy-button btn-sm"
+                    onClick={() => navigate('/insights/new')}
+                  >
+                    <i className="bi bi-plus-lg me-1"></i> New
+                  </button>
+                )}
               </div>
               {insights.length === 0 ? (
                 <div className="text-center py-5">
@@ -214,7 +261,8 @@ function Profile() {
                       insight={insight}
                       onEdit={handleEditInsight}
                       onDelete={handleDeleteInsight}
-                      isProfile={true}
+                      isProfile={userId === currentUser?._id}
+                      currentUser={currentUser}
                     />
                   ))}
                 </div>
@@ -266,10 +314,16 @@ function Profile() {
                 <span className="text-muted">Following</span>
                 <span className="fw-bold">{user.following ? user.following.length : 0}</span>
               </div>
-              <div className="d-flex justify-content-between">
+              <div className="d-flex justify-content-between mb-2">
                 <span className="text-muted">Followers</span>
                 <span className="fw-bold">{user.followers ? user.followers.length : 0}</span>
               </div>
+              {user.followedTags && user.followedTags.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-muted">Followed Tags: </span>
+                  <span>{user.followedTags.join(', ')}</span>
+                </div>
+              )}
               <hr className="my-4" />
               <h6 className="mb-3">Additional Info</h6>
               {user.skills && user.skills.length > 0 && (
