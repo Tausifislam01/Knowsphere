@@ -59,7 +59,7 @@ router.get('/followed', auth, async (req, res) => {
     const insights = await Insight.find({
       $or: [
         { userId: { $in: followedUsers }, visibility: { $in: ['public', 'followers'] } },
-        { tags: { $in: followedTags }, visibility: 'public' }, // Updated to use $in for array
+        { tags: { $in: followedTags }, visibility: 'public' },
       ],
     })
       .populate('userId', 'username profilePicture')
@@ -67,6 +67,23 @@ router.get('/followed', auth, async (req, res) => {
     res.json(insights);
   } catch (error) {
     console.error('Get followed insights error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get insights by tag
+router.get('/tags/:tag', auth, async (req, res) => {
+  try {
+    const { tag } = req.params;
+    const insights = await Insight.find({
+      tags: tag,
+      visibility: 'public',
+    })
+      .populate('userId', 'username profilePicture')
+      .sort({ createdAt: -1 });
+    res.json(insights);
+  } catch (error) {
+    console.error('Get insights by tag error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

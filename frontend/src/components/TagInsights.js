@@ -1,4 +1,3 @@
-// frontend/src/components/TagInsights.js
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -19,13 +18,13 @@ function TagInsights({ currentUser }) {
         console.log('Fetching insights for tag:', tag);
         const response = await fetch(`http://localhost:5000/api/insights/tags/${encodeURIComponent(tag)}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json',
           },
         });
         if (response.ok) {
           const data = await response.json();
-          setInsights(data);
+          setInsights(Array.isArray(data) ? data : []);
         } else {
           const errorData = await response.json();
           toast.error(errorData.message || 'Failed to fetch insights', { autoClose: 2000 });
@@ -39,43 +38,60 @@ function TagInsights({ currentUser }) {
         setIsLoading(false);
       }
     };
-    fetchInsights();
+    if (tag) {
+      fetchInsights();
+    } else {
+      setError('No tag specified');
+      setIsLoading(false);
+      toast.error('No tag specified', { autoClose: 2000 });
+    }
   }, [tag]);
 
   return (
-    <div className="container mt-4">
-      <h2>
-        <Link to="/" className="text-decoration-none">
-          <i className="bi bi-arrow-left me-2"></i>
+    <div className="container py-4">
+      <div className="d-flex align-items-center mb-4">
+        <Link to="/" className="glossy-button btn btn-sm me-3">
+          <i className="bi bi-arrow-left me-2"></i>Back to Home
         </Link>
-        Insights tagged with #{tag}
-      </h2>
-      {currentUser && (
-        <div className="mb-3">
-          <FollowButton tag={tag} currentUser={currentUser} />
-        </div>
-      )}
+        <h2 className="mb-0">Insights tagged with #{tag}</h2>
+        {currentUser && (
+          <FollowButton tag={tag} currentUser={currentUser} className="glossy-button btn btn-sm ms-3" />
+        )}
+      </div>
       {isLoading ? (
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status">
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }} role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
+          <p className="mt-3">Loading insights...</p>
         </div>
       ) : error ? (
-        <div className="alert alert-danger">{error}</div>
+        <div className="alert alert-danger d-flex align-items-center">
+          <i className="bi bi-exclamation-triangle-fill me-2"></i>
+          <div>{error}</div>
+        </div>
       ) : insights.length === 0 ? (
-        <p className="text-muted">No insights found for this tag.</p>
+        <div className="text-center py-5">
+          <i className="bi bi-lightbulb text-muted" style={{ fontSize: '3rem' }}></i>
+          <h4 className="mt-3 text-muted">No insights found for #{tag}</h4>
+          <p className="text-muted mb-4">Be the first to share an insight with this tag!</p>
+          <Link to="/insights/new" className="glossy-button btn btn-sm">
+            <i className="bi bi-plus-lg me-2"></i>Create Insight
+          </Link>
+        </div>
       ) : (
-        insights.map((insight) => (
-          <Insight
-            key={insight._id}
-            insight={insight}
-            currentUser={currentUser}
-            isProfile={false}
-            onEdit={null}
-            onDelete={null}
-          />
-        ))
+        <div className="row g-4">
+          {insights.map((insight) => (
+            <Insight
+              key={insight._id}
+              insight={insight}
+              currentUser={currentUser}
+              isProfile={false}
+              onEdit={null}
+              onDelete={null}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

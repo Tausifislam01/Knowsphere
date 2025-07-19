@@ -109,7 +109,7 @@ function Insight({ insight, currentUser, onEdit, onDelete, isProfile }) {
                 <i className="bi bi-link-45deg me-2"></i>Copy Link
               </button>
             </li>
-            {currentUser && <BookmarkButton insightId={insight._id} className="dropdown-item" />}
+            {currentUser && <BookmarkButton insightId={insight._id} />}
             {currentUser && currentUser._id !== insight.userId._id && (
               <li>
                 <button className="dropdown-item" onClick={handleReport}>
@@ -164,12 +164,13 @@ function Insight({ insight, currentUser, onEdit, onDelete, isProfile }) {
         {tagsArray.length > 0 && (
           <div className="mb-3">
             {tagsArray.map((tag) => (
-              <span key={tag} className="badge bg-light text-dark me-1">
+              <Link
+                key={tag}
+                to={`/tags/${encodeURIComponent(tag)}`}
+                className="tag-link me-1"
+              >
                 #{tag}
-                {currentUser && (
-                  <FollowButton tag={tag} currentUser={currentUser} className="ms-2" />
-                )}
-              </span>
+              </Link>
             ))}
           </div>
         )}

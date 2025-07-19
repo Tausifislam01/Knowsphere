@@ -9,6 +9,7 @@
   --card-text: #ffffff;
   --accent-light: #cccccc;
   --danger: #dc3545;
+  --link-blue: #4a90e2; /* Blue for clickable links */
   --glossy-effect: linear-gradient(
     to bottom,
     rgba(255, 255, 255, 0.2) 0%,
@@ -141,7 +142,28 @@ button.btn-primary:hover {
 }
 
 .dropdown-item.bookmark-button.bookmarked {
-  color: #4a90e2; /* Blue to indicate bookmarked state */
+  color: var(--link-blue); /* Match tag link color */
+}
+
+/* Tags */
+.tag-link {
+  background: rgba(255, 255, 255, 0.15); /* Slightly more opaque for contrast */
+  color: var(--link-blue); /* Blue to indicate clickable link */
+  text-decoration: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.25rem;
+  margin-right: 0.5rem;
+  font-size: 0.9rem;
+  border: 1px solid rgba(74, 144, 226, 0.3); /* Subtle blue border for visibility */
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+
+.tag-link:hover {
+  background: rgba(255, 255, 255, 0.25); /* Brighter on hover */
+  color: #7ab0ff; /* Lighter blue for hover */
+  transform: translateY(-1px);
+  border-color: rgba(74, 144, 226, 0.5); /* Stronger border on hover */
 }
 
 /* Images */
