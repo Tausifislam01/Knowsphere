@@ -26,6 +26,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/:userId" element={<Profile />} />
           <Route path="/edit-profile" element={<EditProfile />} />
           <Route path="/insights/new" element={<InsightForm mode="create" />} />
           <Route path="/insights/edit/:id" element={<InsightForm mode="edit" />} />

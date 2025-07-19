@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import { io } from 'socket.io-client';
 
-function BookmarkButton({ insightId }) {
+const BACKEND_URL = 'http://localhost:5000';
+const socket = io(BACKEND_URL, {
+  auth: { token: localStorage.getItem('token') },
+});
+
+function BookmarkButton({ insightId, className }) {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,6 +30,24 @@ function BookmarkButton({ insightId }) {
     if (localStorage.getItem('token')) {
       checkBookmark();
     }
+
+    socket.on('bookmarkAdded', ({ insightId: updatedInsightId }) => {
+      if (updatedInsightId === insightId) {
+        setIsBookmarked(true);
+        toast.success('Insight bookmarked!', { autoClose: 2000 });
+      }
+    });
+    socket.on('bookmarkRemoved', ({ insightId: updatedInsightId }) => {
+      if (updatedInsightId === insightId) {
+        setIsBookmarked(false);
+        toast.success('Bookmark removed!', { autoClose: 2000 });
+      }
+    });
+
+    return () => {
+      socket.off('bookmarkAdded');
+      socket.off('bookmarkRemoved');
+    };
   }, [insightId]);
 
   const handleBookmarkToggle = async () => {
@@ -42,12 +67,15 @@ function BookmarkButton({ insightId }) {
       });
       if (response.ok) {
         setIsBookmarked(!isBookmarked);
+        toast.success(isBookmarked ? 'Bookmark removed!' : 'Insight bookmarked!', { autoClose: 2000 });
       } else {
         const data = await response.json();
         setError(data.message || 'Failed to toggle bookmark');
+        toast.error(data.message || 'Failed to toggle bookmark', { autoClose: 2000 });
       }
     } catch (error) {
       setError('Error: ' + error.message);
+      toast.error('Error: ' + error.message, { autoClose: 2000 });
     }
   };
 
@@ -56,10 +84,10 @@ function BookmarkButton({ insightId }) {
   return (
     <div>
       <button
-        className={`btn ${isBookmarked ? 'btn-primary' : 'btn-outline-primary'} glossy-button`}
+        className={`dropdown-item bookmark-button ${isBookmarked ? 'bookmarked' : ''} ${className || ''}`}
         onClick={handleBookmarkToggle}
       >
-        <i className={`bi ${isBookmarked ? 'bi-bookmark-fill' : 'bi-bookmark'} me-2`}></i>
+        <i className={`bi ${isBookmarked ? 'bi-bookmark-fill' : 'bi-bookmark'}`}></i>
         {isBookmarked ? 'Unbookmark' : 'Bookmark'}
       </button>
       {error && (

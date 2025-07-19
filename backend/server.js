@@ -1,71 +1,60 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
-require('dotenv').config();
+const authRoutes = require('./routes/authroutes');
+const insightsRoutes = require('./routes/insightroutes');
+const bookmarkRoutes = require('./routes/bookmarkroutes');
+const commentsRoutes = require('./routes/comments');
+
+dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: 'http://localhost:3000', // Adjust to your frontend URL
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
 });
 
-// Middleware
-app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true,
-}));
+// Middleware to attach io to req
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 
-// Socket.IO Authentication
-io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
-  if (!token) {
-    return next(new Error('Authentication error'));
-  }
-  const jwt = require('jsonwebtoken');
-  jwt.verify(token, process.env.JWT_SECRET || 'your_default_secret', (err, decoded) => {
-    if (err) {
-      console.error('Socket.IO auth error:', err.message); // Silent logging for debugging
-      return next(new Error('Authentication error'));
-    }
-    socket.user = decoded;
-    next();
+app.use('/api/auth', authRoutes);
+app.use('/api/insights', insightsRoutes);
+app.use('/api/bookmarks', bookmarkRoutes);
+app.use('/api/insights', commentsRoutes);
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
   });
 });
 
-// Socket.IO Connection
-io.on('connection', (socket) => {
-  // Removed console.log for user connect/disconnect
-  socket.on('disconnect', () => {});
-});
-
-// Routes
-const authRoutes = require('./routes/authroutes');
-const insightRoutes = require('./routes/insightroutes');
-const bookmarkRoutes = require('./routes/bookmarkroutes');
-
-app.use('/api/auth', authRoutes);
-app.use('/api/insights', insightRoutes);
-app.use('/api/bookmarks', bookmarkRoutes);
-
-// Pass Socket.IO to insightroutes
-insightRoutes.setIo(io);
-
-// Default 404 handler
-app.use((req, res) => {
-  res.status(404).json({ message: 'Endpoint not found' });
-});
-
-// MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
+// MongoDB connection
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(() => console.log('Connected to MongoDB Atlas'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch((err) => console.error('MongoDB connection error:', err));
 
+// Start server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

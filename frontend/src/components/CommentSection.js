@@ -59,7 +59,6 @@ function CommentSection({ insightId }) {
     socket.on('newComment', (comment) => {
       if (comment.insightId === insightId) {
         setComments((prevComments) => {
-          // Avoid duplicates by checking if comment already exists
           if (!prevComments.some(c => c._id === comment._id)) {
             return [...prevComments, comment];
           }
@@ -103,7 +102,7 @@ function CommentSection({ insightId }) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
       const addedComment = await response.json();
-      // Update comments via Socket.IO event, so no need to add here
+      setComments((prevComments) => [...prevComments, addedComment]);
       parentCommentId ? setReplyText('') : setNewComment('');
       setReplyingTo(null);
       setError('');

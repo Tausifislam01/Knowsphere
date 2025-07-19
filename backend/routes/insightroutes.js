@@ -1,4 +1,3 @@
-// backend/routes/insightroutes.js
 const express = require('express');
 const router = express.Router();
 const Insight = require('../models/Insight');
@@ -10,6 +9,18 @@ const auth = require('../middleware/auth');
 let io;
 router.setIo = (socketIo) => {
   io = socketIo;
+};
+
+// Helper function to normalize tags
+const normalizeTags = (tags) => {
+  if (!tags) return [];
+  if (Array.isArray(tags)) {
+    return tags.map(tag => tag.trim()).filter(tag => tag);
+  }
+  if (typeof tags === 'string') {
+    return tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+  }
+  return [];
 };
 
 // Get user-specific insights
@@ -48,7 +59,7 @@ router.get('/followed', auth, async (req, res) => {
     const insights = await Insight.find({
       $or: [
         { userId: { $in: followedUsers }, visibility: { $in: ['public', 'followers'] } },
-        { tags: { $regex: followedTags.join('|'), $options: 'i' }, visibility: 'public' },
+        { tags: { $in: followedTags }, visibility: 'public' }, // Updated to use $in for array
       ],
     })
       .populate('userId', 'username profilePicture')
@@ -103,7 +114,7 @@ router.post('/', auth, async (req, res) => {
     const insight = new Insight({
       title,
       body,
-      tags: tags || '',
+      tags: normalizeTags(tags),
       visibility: visibility || 'public',
       userId: req.user.id,
       upvotes: [],
@@ -112,6 +123,11 @@ router.post('/', auth, async (req, res) => {
     });
     await insight.save();
     const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
+    if (io) {
+      io.emit('newInsight', populatedInsight);
+    } else {
+      console.warn('Socket.IO instance not available for newInsight event');
+    }
     res.status(201).json(populatedInsight);
   } catch (error) {
     console.error('Create insight error:', error);
@@ -132,13 +148,19 @@ router.put('/:id', auth, async (req, res) => {
     }
     insight.title = title || insight.title;
     insight.body = body || insight.body;
-    insight.tags = tags !== undefined ? tags : insight.tags;
+    insight.tags = tags !== undefined ? normalizeTags(tags) : insight.tags;
     if (visibility && !['public', 'followers', 'private'].includes(visibility)) {
       return res.status(400).json({ message: 'Invalid visibility value' });
     }
     insight.visibility = visibility || insight.visibility;
+    insight.updatedAt = Date.now();
     await insight.save();
     const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
+    if (io) {
+      io.emit('insightUpdated', populatedInsight);
+    } else {
+      console.warn('Socket.IO instance not available for insightUpdated event');
+    }
     res.json(populatedInsight);
   } catch (error) {
     console.error('Update insight error:', error);
@@ -158,6 +180,11 @@ router.delete('/:id', auth, async (req, res) => {
     }
     await Comment.deleteMany({ insightId: req.params.id });
     await Insight.deleteOne({ _id: req.params.id });
+    if (io) {
+      io.emit('insightDeleted', { id: req.params.id });
+    } else {
+      console.warn('Socket.IO instance not available for insightDeleted event');
+    }
     res.json({ message: 'Insight and associated comments deleted' });
   } catch (error) {
     console.error('Delete insight error:', error);
@@ -197,6 +224,11 @@ router.post('/:insightId/vote', auth, async (req, res) => {
     }
     await insight.save();
     const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
+    if (io) {
+      io.emit('insightVoted', { insightId: req.params.insightId, voteType, userId });
+    } else {
+      console.warn('Socket.IO instance not available for insightVoted event');
+    }
     res.json({ message: 'Vote updated', insight: populatedInsight });
   } catch (error) {
     console.error('Vote insight error:', error);
@@ -237,10 +269,14 @@ router.post('/:insightId/comments', auth, async (req, res) => {
     insight.commentCount = (insight.commentCount || 0) + 1;
     await insight.save();
     const populatedComment = await Comment.findById(comment._id).populate('userId', 'username profilePicture');
-    io.emit('newComment', {
-      ...populatedComment.toObject(),
-      insightId: req.params.insightId,
-    });
+    if (io) {
+      io.emit('newComment', {
+        ...populatedComment.toObject(),
+        insightId: req.params.insightId,
+      });
+    } else {
+      console.warn('Socket.IO instance not available for newComment event');
+    }
     res.status(201).json(populatedComment);
   } catch (error) {
     console.error('Create comment error:', error);
@@ -286,6 +322,11 @@ router.put('/comments/:commentId', auth, async (req, res) => {
     comment.updatedAt = Date.now();
     await comment.save();
     const populatedComment = await Comment.findById(comment._id).populate('userId', 'username profilePicture');
+    if (io) {
+      io.emit('commentUpdated', populatedComment);
+    } else {
+      console.warn('Socket.IO instance not available for commentUpdated event');
+    }
     res.json(populatedComment);
   } catch (error) {
     console.error('Update comment error:', error);
@@ -309,6 +350,11 @@ router.delete('/comments/:commentId', auth, async (req, res) => {
     await Insight.findByIdAndUpdate(comment.insightId, {
       $inc: { commentCount: -(1 + replyCount) },
     });
+    if (io) {
+      io.emit('commentDeleted', { commentId: req.params.commentId, insightId: comment.insightId });
+    } else {
+      console.warn('Socket.IO instance not available for commentDeleted event');
+    }
     res.json({ message: 'Comment and replies deleted' });
   } catch (error) {
     console.error('Delete comment error:', error);

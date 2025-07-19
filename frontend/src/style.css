@@ -101,23 +101,47 @@ button.btn-primary:hover {
 }
 
 /* Dropdown */
-.dropdown-menu {
+.dropdown {
   z-index: 1000;
+}
+
+.dropdown-menu {
   min-width: 10rem;
   background: var(--card-bg);
   color: var(--card-text);
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  border-radius: 0.25rem;
 }
 
 .dropdown-item {
   color: var(--card-text);
-  padding: 0.25rem 1rem;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
 }
 
-.dropdown-item:hover {
+.dropdown-item:hover,
+.dropdown-item.bookmark-button:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: var(--accent-light);
+}
+
+.dropdown-item.bookmark-button {
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.dropdown-item.bookmark-button i.bi {
+  font-size: 1rem;
+}
+
+.dropdown-item.bookmark-button.bookmarked {
+  color: #4a90e2; /* Blue to indicate bookmarked state */
 }
 
 /* Images */
@@ -149,6 +173,15 @@ button.btn-primary:hover {
   min-height: 40px;
   position: relative;
   z-index: 10;
+}
+
+.comment-section .border-start {
+  border-left: 2px solid #4a5568 !important; /* Tailwind gray-600 */
+  padding-left: 1.5rem;
+}
+
+.comment-section .ps-4 {
+  margin-left: 1rem;
 }
 
 /* Card footer */

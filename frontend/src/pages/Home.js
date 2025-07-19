@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import Insight from '../components/Insight';
 
 function Home() {
@@ -29,6 +29,7 @@ function Home() {
         }
       } catch (error) {
         console.error('Fetch user error:', error);
+        toast.error('Failed to load user profile', { autoClose: 2000 });
       }
     };
     fetchCurrentUser();
@@ -58,6 +59,7 @@ function Home() {
           setError(error.message.includes('Failed to fetch')
             ? 'Unable to connect to the server. Please try again later.'
             : `Error: ${error.message}`);
+          toast.error(`Error: ${error.message}`, { autoClose: 2000 });
         } finally {
           setIsLoading(false);
         }
@@ -85,6 +87,7 @@ function Home() {
           setError(error.message.includes('Failed to fetch')
             ? 'Unable to connect to the server. Please try again later.'
             : `Error: ${error.message}`);
+          toast.error(`Error: ${error.message}`, { autoClose: 2000 });
         } finally {
           setIsLoading(false);
         }
@@ -99,16 +102,16 @@ function Home() {
 
   const filteredInsights = insights.filter(insight => {
     const matchesSearch = insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        insight.body.toLowerCase().includes(searchTerm.toLowerCase());
+                         insight.body.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTag = selectedTag
-      ? insight.tags && insight.tags.split(',').map(t => t.trim().toLowerCase()).includes(selectedTag.toLowerCase())
+      ? insight.tags && Array.isArray(insight.tags) && insight.tags.map(t => t.trim().toLowerCase()).includes(selectedTag.toLowerCase())
       : true;
     return matchesSearch && matchesTag;
   });
 
   const allTags = [...new Set(
     insights.flatMap(insight =>
-      insight.tags ? insight.tags.split(',').map(t => t.trim()) : []
+      Array.isArray(insight.tags) ? insight.tags.map(t => t.trim()) : []
     )
   )];
 
@@ -141,7 +144,7 @@ function Home() {
           <Link to="/" className="glossy-button btn btn-sm mb-4">
             <i className="bi bi-arrow-left me-2"></i>Back to Home
           </Link>
-          <Insight insight={singleInsight} />
+          <Insight insight={singleInsight} currentUser={currentUser} />
         </>
       ) : (
         <>

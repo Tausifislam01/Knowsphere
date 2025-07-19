@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -105,6 +104,23 @@ router.get('/profile', auth, async (req, res) => {
   }
 });
 
+// Get Profile by User ID
+router.get('/profile/:userId', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .select('-password')
+      .populate('followers', 'username profilePicture')
+      .populate('following', 'username profilePicture');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error('Get user profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Update Profile
 router.put('/profile', auth, upload.single('profilePicture'), async (req, res) => {
   const {
@@ -123,7 +139,7 @@ router.put('/profile', auth, upload.single('profilePicture'), async (req, res) =
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(400).json({ message: 'User not found' });
     }
 
     const oldProfilePicture = user.profilePicture;

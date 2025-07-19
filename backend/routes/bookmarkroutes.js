@@ -24,8 +24,19 @@ router.post('/', auth, async (req, res) => {
       insightId,
     });
     await bookmark.save();
-    res.status(201).json(bookmark);
+    const populatedBookmark = await Bookmark.findById(bookmark._id).populate({
+      path: 'insightId',
+      populate: { path: 'userId', select: 'username profilePicture' },
+    });
+    // Emit Socket.IO event if io is available
+    if (req.io) {
+      req.io.emit('bookmarkAdded', { userId: req.user.id, insightId });
+    } else {
+      console.warn('Socket.IO instance not available for bookmarkAdded event');
+    }
+    res.status(201).json(populatedBookmark);
   } catch (error) {
+    console.error('Create bookmark error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -35,10 +46,11 @@ router.get('/', auth, async (req, res) => {
   try {
     const bookmarks = await Bookmark.find({ userId: req.user.id }).populate({
       path: 'insightId',
-      populate: { path: 'userId', select: 'username' },
+      populate: { path: 'userId', select: 'username profilePicture' },
     });
     res.json(bookmarks);
   } catch (error) {
+    console.error('Fetch bookmarks error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -51,8 +63,15 @@ router.delete('/:insightId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Bookmark not found' });
     }
     await Bookmark.deleteOne({ _id: bookmark._id });
+    // Emit Socket.IO event if io is available
+    if (req.io) {
+      req.io.emit('bookmarkRemoved', { userId: req.user.id, insightId: req.params.insightId });
+    } else {
+      console.warn('Socket.IO instance not available for bookmarkRemoved event');
+    }
     res.json({ message: 'Bookmark deleted' });
   } catch (error) {
+    console.error('Delete bookmark error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
