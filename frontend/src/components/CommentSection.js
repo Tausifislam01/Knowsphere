@@ -44,6 +44,8 @@ function CommentSection({ insightId }) {
       } catch (error) {
         console.error('Fetch comments error:', error);
         setError(`Error: ${error.message}`);
+        toast.error(`Error fetching comments: ${error.message}`, { autoClose: 2000 });
+        window.alert(`Error fetching comments: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
@@ -65,6 +67,7 @@ function CommentSection({ insightId }) {
           return prevComments;
         });
         toast.info('New comment added!', { autoClose: 2000 });
+        window.alert('A new comment has been added!');
       }
     });
 
@@ -78,11 +81,15 @@ function CommentSection({ insightId }) {
     e.preventDefault();
     if (!token) {
       setShowAuthModal(true);
+      toast.error('Please log in to post a comment', { autoClose: 2000 });
+      window.alert('Please log in to post a comment');
       return;
     }
     const text = parentCommentId ? replyText : newComment;
     if (!text.trim()) {
       setError('Comment cannot be empty');
+      toast.error('Comment cannot be empty', { autoClose: 2000 });
+      window.alert('Comment cannot be empty');
       return;
     }
 
@@ -107,9 +114,13 @@ function CommentSection({ insightId }) {
       setReplyingTo(null);
       setError('');
       setDisplayedComments((prev) => Math.max(prev, comments.length + 1));
+      toast.success(parentCommentId ? 'Reply posted successfully' : 'Comment posted successfully', { autoClose: 2000 });
+      window.alert(parentCommentId ? 'Your reply has been posted successfully' : 'Your comment has been posted successfully');
     } catch (error) {
       console.error('Add comment error:', error);
       setError(`Error: ${error.message}`);
+      toast.error(`Error posting ${parentCommentId ? 'reply' : 'comment'}: ${error.message}`, { autoClose: 2000 });
+      window.alert(`Error posting ${parentCommentId ? 'reply' : 'comment'}: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -119,10 +130,14 @@ function CommentSection({ insightId }) {
     e.preventDefault();
     if (!token) {
       setShowAuthModal(true);
+      toast.error('Please log in to edit a comment', { autoClose: 2000 });
+      window.alert('Please log in to edit a comment');
       return;
     }
     if (!editText.trim()) {
       setError('Comment cannot be empty');
+      toast.error('Comment cannot be empty', { autoClose: 2000 });
+      window.alert('Comment cannot be empty');
       return;
     }
 
@@ -148,9 +163,13 @@ function CommentSection({ insightId }) {
       setEditingCommentId(null);
       setEditText('');
       setError('');
+      toast.success('Comment edited successfully', { autoClose: 2000 });
+      window.alert('Your comment has been edited successfully');
     } catch (error) {
       console.error('Edit comment error:', error);
       setError(`Error: ${error.message}`);
+      toast.error(`Error editing comment: ${error.message}`, { autoClose: 2000 });
+      window.alert(`Error editing comment: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -159,6 +178,8 @@ function CommentSection({ insightId }) {
   const handleDeleteComment = async (commentId) => {
     if (!token) {
       setShowAuthModal(true);
+      toast.error('Please log in to delete a comment', { autoClose: 2000 });
+      window.alert('Please log in to delete a comment');
       return;
     }
     if (!window.confirm('Are you sure you want to delete this comment?')) return;
@@ -175,9 +196,13 @@ function CommentSection({ insightId }) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
       setComments(comments.filter(comment => comment._id !== commentId));
+      toast.success('Comment deleted successfully', { autoClose: 2000 });
+      window.alert('Your comment has been deleted successfully');
     } catch (error) {
       console.error('Delete comment error:', error);
       setError(`Error: ${error.message}`);
+      toast.error(`Error deleting comment: ${error.message}`, { autoClose: 2000 });
+      window.alert(`Error deleting comment: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -186,6 +211,8 @@ function CommentSection({ insightId }) {
   const handleReplyClick = (commentId) => {
     if (!token) {
       setShowAuthModal(true);
+      toast.error('Please log in to reply to a comment', { autoClose: 2000 });
+      window.alert('Please log in to reply to a comment');
       return;
     }
     setReplyingTo(commentId);
@@ -197,6 +224,8 @@ function CommentSection({ insightId }) {
   const handleEditClick = (commentId, currentText) => {
     if (!token) {
       setShowAuthModal(true);
+      toast.error('Please log in to edit a comment', { autoClose: 2000 });
+      window.alert('Please log in to edit a comment');
       return;
     }
     setEditingCommentId(commentId);
@@ -225,6 +254,8 @@ function CommentSection({ insightId }) {
   const toggleReplies = (commentId) => {
     if (!token) {
       setShowAuthModal(true);
+      toast.error('Please log in to view replies', { autoClose: 2000 });
+      window.alert('Please log in to view replies');
       return;
     }
     setShowReplies(prev => ({ ...prev, [commentId]: !prev[commentId] }));
@@ -241,6 +272,8 @@ function CommentSection({ insightId }) {
       console.log('Available insight IDs in DOM:',
         Array.from(document.querySelectorAll('[id^="insight-"]')).map(el => el.id));
       setError('Unable to scroll to insight: Post not found.');
+      toast.error('Unable to scroll to insight: Post not found.', { autoClose: 2000 });
+      window.alert('Unable to scroll to insight: Post not found.');
     }
   };
 

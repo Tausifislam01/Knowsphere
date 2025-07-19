@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Insight from '../components/Insight';
 
 function Home() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [insights, setInsights] = useState([]);
   const [singleInsight, setSingleInsight] = useState(null);
   const [error, setError] = useState('');
@@ -100,6 +101,36 @@ function Home() {
     };
   }, [id, showFollowed]);
 
+  const handleEdit = (insightId) => {
+    navigate(`/insights/${insightId}/edit`);
+  };
+
+  const handleDelete = async (insightId) => {
+    if (!window.confirm('Are you sure you want to delete this insight?')) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/insights/${insightId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      if (response.ok) {
+        setInsights(insights.filter(insight => insight._id !== insightId));
+        toast.success('Insight deleted successfully', { autoClose: 2000 });
+        window.alert('Your insight has been deleted successfully');
+      } else {
+        const data = await response.json();
+        toast.error(data.message || 'Failed to delete insight', { autoClose: 2000 });
+        window.alert(data.message || 'Failed to delete insight');
+      }
+    } catch (error) {
+      console.error('Delete insight error:', error);
+      toast.error('Error deleting insight', { autoClose: 2000 });
+      window.alert('Error deleting insight: ' + error.message);
+    }
+  };
+
   const filteredInsights = insights.filter(insight => {
     const matchesSearch = insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          insight.body.toLowerCase().includes(searchTerm.toLowerCase());
@@ -144,7 +175,12 @@ function Home() {
           <Link to="/" className="glossy-button btn btn-sm mb-4">
             <i className="bi bi-arrow-left me-2"></i>Back to Home
           </Link>
-          <Insight insight={singleInsight} currentUser={currentUser} />
+          <Insight
+            insight={singleInsight}
+            currentUser={currentUser}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         </>
       ) : (
         <>
@@ -236,6 +272,8 @@ function Home() {
                   key={insight._id}
                   insight={insight}
                   currentUser={currentUser}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
                 />
               ))}
             </div>

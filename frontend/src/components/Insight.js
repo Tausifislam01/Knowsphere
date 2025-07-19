@@ -12,7 +12,7 @@ const socket = io(BACKEND_URL, {
   auth: { token: localStorage.getItem('token') },
 });
 
-function Insight({ insight, currentUser, onEdit, onDelete, isProfile }) {
+function Insight({ insight, currentUser, onEdit, onDelete }) {
   const [voteStatus, setVoteStatus] = useState({
     upvotes: insight.upvotes.length,
     downvotes: insight.downvotes.length,
@@ -117,7 +117,7 @@ function Insight({ insight, currentUser, onEdit, onDelete, isProfile }) {
                 </button>
               </li>
             )}
-            {currentUser && currentUser._id === insight.userId._id && isProfile && onEdit && onDelete && (
+            {currentUser && currentUser._id === insight.userId._id && onEdit && onDelete && (
               <>
                 <li>
                   <button className="dropdown-item" onClick={() => onEdit(insight._id)}>
