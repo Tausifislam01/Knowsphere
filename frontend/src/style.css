@@ -33,16 +33,29 @@ body {
   background-color: var(--navbar-bg);
   background-image: var(--glossy-effect);
   color: var(--navbar-text);
-  box-shadow: 0 2px 10px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  padding: 0.5rem 1rem;
+  z-index: 1000;
 }
 
 .navbar-brand,
 .nav-link {
   color: var(--navbar-text) !important;
+  font-weight: 500;
+  transition: color 0.3s ease;
 }
 
+.navbar-brand:hover,
 .nav-link:hover {
   color: var(--accent-light) !important;
+}
+
+.navbar-toggler {
+  border-color: var(--navbar-text);
+}
+
+.navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.8)' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
 }
 
 /* Buttons */

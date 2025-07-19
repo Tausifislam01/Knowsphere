@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 function InsightForm({ mode = 'create' }) {
   const [formData, setFormData] = useState({
@@ -27,16 +28,21 @@ function InsightForm({ mode = 'create' }) {
             setFormData({
               title: data.title || '',
               body: data.body || '',
-              tags: data.tags || '',
+              tags: data.tags ? data.tags.join(', ') : '',
               visibility: data.visibility || 'public',
             });
+            toast.success('Insight data loaded successfully', { autoClose: 2000 });
           } else {
             setError(data.message || 'Failed to fetch insight');
-            navigate('/profile');
+            toast.error(data.message || 'Failed to fetch insight', { autoClose: 2000 });
+            // window.alert(data.message || 'Failed to fetch insight');
+            navigate('/');
           }
         } catch (error) {
           setError('Error: ' + error.message);
-          navigate('/profile');
+          toast.error('Error fetching insight: ' + error.message, { autoClose: 2000 });
+          // window.alert('Error fetching insight: ' + error.message);
+          navigate('/');
         }
       };
       fetchInsight();
@@ -71,6 +77,12 @@ function InsightForm({ mode = 'create' }) {
       setIsLoading(false);
       return;
     }
+
+    const tagsArray = formData.tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag !== '');
+
     try {
       const url = mode === 'edit' && id 
         ? `http://localhost:5000/api/insights/${id}`
@@ -82,16 +94,27 @@ function InsightForm({ mode = 'create' }) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          title: formData.title,
+          body: formData.body,
+          tags: tagsArray,
+          visibility: formData.visibility,
+        }),
       });
       if (response.ok) {
-        navigate('/profile');
+        toast.success(`Your insight has been ${mode === 'edit' ? 'updated' : 'created'} successfully`, { autoClose: 2000 });
+        // window.alert(`Your insight has been ${mode === 'edit' ? 'updated' : 'created'} successfully`);
+        navigate('/');
       } else {
         const data = await response.json();
         setError(data.message || `Failed to ${mode} insight`);
+        toast.error(data.message || `Failed to ${mode} insight`, { autoClose: 2000 });
+        // window.alert(data.message || `Failed to ${mode} insight`);
       }
     } catch (error) {
       setError('Error: ' + error.message);
+      toast.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} insight: ${error.message}`, { autoClose: 2000 });
+      // window.alert(`Error ${mode === 'edit' ? 'updating' : 'creating'} insight: ${error.message}`);
     } finally {
       setIsLoading(false);
     }

@@ -1,13 +1,15 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
-function Navbar() {
+function Navbar({ currentUser }) {
   const navigate = useNavigate();
-  const isAuthenticated = !!localStorage.getItem('token');
+  const isAuthenticated = !!currentUser;
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
+    toast.success('Logged out successfully', { autoClose: 2000 });
     navigate('/login');
   };
 
@@ -31,16 +33,15 @@ function Navbar() {
             <Link className="nav-link" to="/">Home</Link>
             {isAuthenticated ? (
               <>
-                <Link className="nav-link" to="/profile">Profile</Link>
+                <Link className="nav-link" to={`/profile/${currentUser._id}`}>Profile</Link>
                 <Link className="nav-link" to="/bookmarks">Bookmarks</Link>
                 <Link className="nav-link" to="/settings">Settings</Link>
-                <Link
-                  className="nav-link"
-                  to="/login"
+                <button
+                  className="nav-link btn btn-link"
                   onClick={handleLogout}
                 >
                   Logout
-                </Link>
+                </button>
               </>
             ) : (
               <>

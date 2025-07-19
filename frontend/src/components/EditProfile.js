@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
-function EditProfile() {
+function EditProfile({ currentUser }) {
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -68,12 +69,15 @@ function EditProfile() {
             profilePicture: null,
           });
           setPreview(data.profilePicture || 'https://via.placeholder.com/150');
+          toast.success('Your profile data has been loaded successfully', { autoClose: 2000 });
         } else {
           setError(data.message || 'Failed to fetch profile');
+          toast.error(data.message || 'Failed to fetch profile', { autoClose: 2000 });
           navigate('/login');
         }
       } catch (error) {
         setError('Error: ' + error.message);
+        toast.error('Error fetching profile: ' + error.message, { autoClose: 2000 });
         navigate('/login');
       }
     };
@@ -98,6 +102,15 @@ function EditProfile() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+
+    if (!currentUser) {
+      setError('You must be logged in to edit your profile');
+      toast.error('You must be logged in to edit your profile', { autoClose: 2000 });
+      // window.alert('You must be logged in to edit your profile');
+      navigate('/login');
+      setIsLoading(false);
+      return;
+    }
 
     const form = new FormData();
     form.append('username', formData.username);
@@ -135,13 +148,19 @@ function EditProfile() {
         body: form,
       });
       if (response.ok) {
-        navigate('/profile');
+        toast.success('Your profile has been updated successfully', { autoClose: 2000 });
+        // window.alert('Your profile has been updated successfully');
+        navigate(`/profile/${currentUser._id}`);
       } else {
         const data = await response.json();
         setError(data.message || 'Failed to update profile');
+        toast.error(data.message || 'Failed to update profile', { autoClose: 2000 });
+        // window.alert(data.message || 'Failed to update profile');
       }
     } catch (error) {
       setError('Error: ' + error.message);
+      toast.error('Error updating profile: ' + error.message, { autoClose: 2000 });
+      // window.alert('Error updating profile: ' + error.message);
     } finally {
       setIsLoading(false);
     }
