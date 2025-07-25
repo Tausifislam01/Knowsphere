@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Comment = require('../models/Comment');
 const Insight = require('../models/Insight');
-const auth = require('../middleware/auth');
+const User = require('../models/User');
+const { auth } = require('../middleware/auth');
 
 // POST /api/insights/:insightId/comments - Create a comment or reply
 router.post('/:insightId/comments', auth, async (req, res) => {
@@ -56,6 +57,43 @@ router.get('/:insightId/comments', auth, async (req, res) => {
   }
 });
 
+// GET /api/insights/comments/:id - Fetch a single comment by ID
+router.get('/comments/:id', auth, async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.id)
+      .populate('userId', 'username profilePicture')
+      .populate('insightId', 'title');
+    if (!comment) {
+      console.log('Comment not found:', req.params.id);
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    console.log('Fetched comment:', comment._id);
+    res.json(comment);
+  } catch (error) {
+    console.error('Fetch comment error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/insights/comments/all - Fetch all comments (admin-only)
+router.get('/comments/all', auth, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) {
+      console.log('Non-admin attempted to fetch all comments:', req.user.username);
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    const comments = await Comment.find()
+      .populate('userId', 'username profilePicture')
+      .populate('insightId', 'title')
+      .sort({ createdAt: -1 });
+    console.log('Fetched all comments:', comments.length);
+    res.json(comments);
+  } catch (error) {
+    console.error('Fetch all comments error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // PUT /api/insights/comments/:commentId - Edit a comment
 router.put('/comments/:commentId', auth, async (req, res) => {
   try {
@@ -83,6 +121,30 @@ router.put('/comments/:commentId', auth, async (req, res) => {
   }
 });
 
+// PUT /api/insights/comments/:commentId/hide - Hide or unhide a comment (admin only)
+router.put('/comments/:commentId/hide', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    comment.isHidden = !comment.isHidden;
+    await comment.save();
+    console.log(`Comment ${comment._id} ${comment.isHidden ? 'hidden' : 'unhidden'}`);
+    const populatedComment = await Comment.findById(comment._id)
+      .populate('userId', 'username profilePicture')
+      .populate('insightId', 'title');
+    res.json(populatedComment);
+  } catch (error) {
+    console.error('Hide comment error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // DELETE /api/insights/comments/:commentId - Delete a comment
 router.delete('/comments/:commentId', auth, async (req, res) => {
   try {
@@ -91,13 +153,14 @@ router.delete('/comments/:commentId', auth, async (req, res) => {
     if (!comment) {
       return res.status(404).json({ message: 'Comment not found' });
     }
-    if (comment.userId.toString() !== req.user.id) {
+    const user = await User.findById(req.user.id);
+    if (comment.userId.toString() !== req.user.id && !user.isAdmin) {
       return res.status(403).json({ message: 'Unauthorized to delete this comment' });
     }
     await Comment.deleteOne({ _id: commentId });
     await Insight.findByIdAndUpdate(comment.insightId, { $inc: { commentCount: -1 } });
     await Comment.deleteMany({ parentCommentId: commentId });
-    res.json({ message: 'Comment deleted' });
+    res.json({ message: 'Comment deleted successfully' });
   } catch (error) {
     console.error('Delete comment error:', error);
     res.status(500).json({ message: 'Server error' });

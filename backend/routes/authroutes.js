@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const auth = require('../middleware/auth');
+const { auth, adminAuth } = require('../middleware/auth');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs').promises;
@@ -57,7 +57,7 @@ router.post('/signup', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
     await user.save();
-    const payload = { user: { id: user.id } };
+    const payload = { user: { id: user.id, isAdmin: user.isAdmin } }; // Include isAdmin in token
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.status(201).json({ token });
   } catch (error) {
@@ -78,7 +78,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    const payload = { user: { id: user.id } };
+    const payload = { user: { id: user.id, isAdmin: user.isAdmin } }; // Include isAdmin in token
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
   } catch (error) {
@@ -406,6 +406,22 @@ router.post('/unfollow-tag/:tag', auth, async (req, res) => {
     res.json({ message: 'Tag unfollowed', user: updatedUser });
   } catch (error) {
     console.error('Unfollow tag error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Assign admin role (for testing, requires adminAuth)
+router.post('/assign-admin/:userId', auth, adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    user.isAdmin = true;
+    await user.save();
+    res.json({ message: 'Admin role assigned', user });
+  } catch (error) {
+    console.error('Assign admin error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

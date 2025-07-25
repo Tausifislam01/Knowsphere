@@ -11,6 +11,7 @@ import Settings from './components/Settings';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import EditProfile from './components/EditProfile';
+import AdminDashboard from './pages/AdminDashboard';
 import 'react-toastify/dist/ReactToastify.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './style.css';
@@ -18,30 +19,27 @@ import './style.css';
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
 
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/auth/profile', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        if (response.ok) {
-          const user = await response.json();
-          setCurrentUser(user);
-          toast.success('User profile loaded successfully', { autoClose: 2000 });
-        } else {
-          toast.error('Failed to load user profile', { autoClose: 2000 });
-        }
-      } catch (error) {
-        console.error('Fetch user error:', error);
-        toast.error('Error connecting to server', { autoClose: 2000 });
-      }
-    };
-    if (localStorage.getItem('token')) {
-      fetchCurrentUser();
+useEffect(() => {
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/profile', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const user = await response.json();
+      console.log('Fetched user:', user); // Debug
+      setCurrentUser(user);
+      toast.success('User profile loaded successfully', { autoClose: 2000 });
+    } catch (error) {
+      console.error('Fetch user error:', error);
+      toast.error('Error connecting to server', { autoClose: 2000 });
     }
-  }, []);
+  };
+  if (localStorage.getItem('token')) {
+    fetchCurrentUser();
+  }
+}, []);
 
   return (
     <Router>
@@ -58,6 +56,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/edit-profile" element={<EditProfile currentUser={currentUser} />} />
+          <Route path="/admin" element={<AdminDashboard currentUser={currentUser} />} />
           <Route path="*" element={
             <div className="container mt-5">
               <h2>404 - Page Not Found</h2>

@@ -8,6 +8,8 @@ const authRoutes = require('./routes/authroutes');
 const insightsRoutes = require('./routes/insightroutes');
 const bookmarkRoutes = require('./routes/bookmarkroutes');
 const commentsRoutes = require('./routes/comments');
+const reportRoutes = require('./routes/reportroutes');
+const adminRoutes = require('./routes/adminroutes');
 
 dotenv.config();
 
@@ -15,11 +17,14 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000', // Adjust to your frontend URL
+    origin: 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
 });
+
+// Pass io to routes that need it
+insightsRoutes.setIo(io);
 
 // Middleware to attach io to req
 app.use((req, res, next) => {
@@ -34,6 +39,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/insights', commentsRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {

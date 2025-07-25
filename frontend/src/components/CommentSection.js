@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
+import ReportButton from './ReportButton';
 
 const BACKEND_URL = 'http://localhost:5000';
 const socket = io(BACKEND_URL, {
   auth: { token: localStorage.getItem('token') },
 });
 
-function CommentSection({ insightId }) {
+function CommentSection({ insightId, currentUser }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [error, setError] = useState('');
@@ -56,7 +57,6 @@ function CommentSection({ insightId }) {
       setShowAuthModal(true);
     }
 
-    // Socket.IO: Listen for new comments
     socket.on('newComment', (comment) => {
       if (comment.insightId === insightId) {
         setComments((prevComments) => {
@@ -66,13 +66,20 @@ function CommentSection({ insightId }) {
           return prevComments;
         });
         toast.info('New comment added!', { autoClose: 2000 });
-        
       }
     });
 
-    // Cleanup
+    socket.on('commentUpdated', (updatedComment) => {
+      if (updatedComment.insightId === insightId) {
+        setComments((prevComments) =>
+          prevComments.map(c => c._id === updatedComment._id ? updatedComment : c)
+        );
+      }
+    });
+
     return () => {
       socket.off('newComment');
+      socket.off('commentUpdated');
     };
   }, [insightId, showComments, token]);
 
@@ -81,7 +88,6 @@ function CommentSection({ insightId }) {
     if (!token) {
       setShowAuthModal(true);
       toast.error('Please log in to post a comment', { autoClose: 2000 });
-      
       return;
     }
     const text = parentCommentId ? replyText : newComment;
@@ -197,6 +203,29 @@ function CommentSection({ insightId }) {
     }
   };
 
+  const handleHideComment = async (commentId) => {
+    if (!token) {
+      setShowAuthModal(true);
+      toast.error('Please log in to hide a comment', { autoClose: 2000 });
+      return;
+    }
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/insights/comments/${commentId}/hide`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setComments(comments.map(c => c._id === commentId ? data : c));
+        toast.success(`Comment ${data.isHidden ? 'hidden' : 'unhidden'} successfully`, { autoClose: 2000 });
+      } else {
+        toast.error(data.message || 'Failed to update comment', { autoClose: 2000 });
+      }
+    } catch (error) {
+      toast.error('Error updating comment: ' + error.message, { autoClose: 2000 });
+    }
+  };
+
   const handleReplyClick = (commentId) => {
     if (!token) {
       setShowAuthModal(true);
@@ -267,137 +296,169 @@ function CommentSection({ insightId }) {
   const buildCommentTree = (comments, parentId = null, depth = 0, isTopLevel = false) => {
     const filteredComments = comments.filter(comment => (comment.parentCommentId || null) === parentId);
     const displayCount = isTopLevel ? displayedComments : filteredComments.length;
-    return filteredComments
-      .slice(0, displayCount)
-      .map(comment => {
-        const hasReplies = comments.some(c => c.parentCommentId === comment._id);
-        const replyCount = comments.filter(c => c.parentCommentId === comment._id).length;
-        return (
-          <div key={comment._id} className={`mb-3 ${depth > 0 ? 'ps-4 border-start border-2 border-light' : ''}`}>
-            <div className="d-flex">
-              <img
-                src={comment.userId?.profilePicture || 'https://via.placeholder.com/40'}
-                className="rounded-circle me-3 img-fluid"
-                style={{ width: '40px', height: '40px', objectFit: 'cover' }}
-                alt="User"
-                onError={(e) => {
-                  console.log('Comment profile picture failed to load for comment:', comment._id);
-                  e.target.src = 'https://via.placeholder.com/40';
-                }}
-              />
-              <div className="flex-grow-1">
-                <div className="d-flex justify-content-between align-items-center mb-1">
-                  <div>
-                    <span className="fw-semibold">{comment.userId?.username || 'Anonymous'}</span>
-                    <span className="text-muted small ms-2">
-                      {new Date(comment.createdAt).toLocaleString()}
-                      {comment.updatedAt && ' (edited)'}
-                    </span>
-                  </div>
-                  {userId === comment.userId?._id && (
-                    <div className="dropdown">
-                      <button
-                        className="btn btn-sm btn-link text-muted p-0"
-                        data-bs-toggle="dropdown"
-                        onClick={() => console.log(`Comment dropdown clicked for comment ${comment._id}`)}
-                      >
-                        <i className="bi bi-three-dots"></i>
-                      </button>
-                      <ul className="dropdown-menu">
-                        <li>
-                          <button
-                            className="dropdown-item"
-                            onClick={() => handleEditClick(comment._id, comment.text)}
-                          >
-                            <i className="bi bi-pencil me-2"></i> Edit
-                          </button>
-                        </li>
-                        <li>
-                          <button
-                            className="dropdown-item text-danger"
-                            onClick={() => handleDeleteComment(comment._id)}
-                          >
-                            <i className="bi bi-trash me-2"></i> Delete
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
-                  )}
+    return filteredComments.slice(0, displayCount).map(comment => {
+      const hasReplies = comments.some(c => c.parentCommentId === comment._id);
+      const replyCount = comments.filter(c => c.parentCommentId === comment._id).length;
+      const isHidden = comment.isHidden && !currentUser?.isAdmin;
+
+      return (
+        <div key={comment._id} className={`mb-3 ${depth > 0 ? 'ps-4 border-start border-2 border-light' : ''}`}>
+          <div className="d-flex">
+            <img
+              src={comment.userId?.profilePicture || 'https://via.placeholder.com/40'}
+              className="rounded-circle me-3 img-fluid"
+              style={{ width: '40px', height: '40px', objectFit: 'cover' }}
+              alt="User"
+              onError={(e) => {
+                console.log('Comment profile picture failed to load for comment:', comment._id);
+                e.target.src = 'https://via.placeholder.com/40';
+              }}
+            />
+            <div className={`flex-grow-1 ${isHidden && currentUser?.isAdmin ? 'bg-light opacity-50' : ''}`}>
+              <div className="d-flex justify-content-between align-items-center mb-1">
+                <div>
+                  <span className="fw-semibold">{comment.userId?.username || 'Anonymous'}</span>
+                  <span className="text-muted small ms-2">
+                    {new Date(comment.createdAt).toLocaleString()}
+                    {comment.updatedAt && ' (edited)'}
+                    {isHidden && currentUser?.isAdmin && ' • Hidden'}
+                  </span>
                 </div>
-                {editingCommentId === comment._id ? (
-                  <form onSubmit={(e) => handleEditComment(e, comment._id)} className="mt-2">
-                    <textarea
-                      className="form-control mb-2"
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      rows="3"
-                    />
-                    <div className="d-flex">
-                      <button type="submit" className="glossy-button btn-sm me-2" disabled={isLoading}>
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm"
-                        onClick={() => setEditingCommentId(null)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <p className="mb-2">{comment.text}</p>
-                    <div className="d-flex">
-                      <button
-                        className="btn btn-link text-muted p-0 me-2"
-                        onClick={() => handleReplyClick(comment._id)}
-                      >
-                        <i className="bi bi-reply me-1"></i> Reply
-                      </button>
-                      <button className="btn btn-link text-muted p-0">
-                        <i className="bi bi-heart me-1"></i> Like
-                      </button>
-                    </div>
-                  </>
+                {currentUser && (
+                  <div className="dropdown">
+                    <button
+                      className="btn btn-sm btn-link text-muted p-0"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                    >
+                      <i className="bi bi-three-dots"></i>
+                    </button>
+                    <ul className="dropdown-menu">
+                      {currentUser._id === comment.userId?._id && (
+                        <>
+                          <li>
+                            <button
+                              className="dropdown-item"
+                              onClick={() => handleEditClick(comment._id, comment.text)}
+                            >
+                              <i className="bi bi-pencil me-2"></i>Edit
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              className="dropdown-item text-danger"
+                              onClick={() => handleDeleteComment(comment._id)}
+                            >
+                              <i className="bi bi-trash me-2"></i>Delete
+                            </button>
+                          </li>
+                        </>
+                      )}
+                      {currentUser._id !== comment.userId?._id && !isHidden && (
+                        <ReportButton itemId={comment._id} itemType="Comment" currentUser={currentUser} />
+                      )}
+                      {currentUser.isAdmin && (
+                        <>
+                          <li>
+                            <button
+                              className="dropdown-item"
+                              onClick={() => handleHideComment(comment._id)}
+                            >
+                              <i className="bi bi-eye-slash me-2"></i>{comment.isHidden ? 'Unhide' : 'Hide'}
+                            </button>
+                          </li>
+                          <li>
+                            <button
+                              className="dropdown-item text-danger"
+                              onClick={() => handleDeleteComment(comment._id)}
+                            >
+                              <i className="bi bi-trash me-2"></i>Delete
+                            </button>
+                          </li>
+                        </>
+                      )}
+                    </ul>
+                  </div>
                 )}
-                {hasReplies && (
-                  <button
-                    className="btn btn-link text-muted p-0 mt-1"
-                    onClick={() => toggleReplies(comment._id)}
-                  >
-                    {showReplies[comment._id] ? `Hide Replies (${replyCount})` : `See Replies (${replyCount})`}
-                  </button>
-                )}
-                {replyingTo === comment._id && (
-                  <form onSubmit={(e) => handleAddComment(e, comment._id)} className="mt-3">
-                    <textarea
-                      className="form-control mb-2"
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      placeholder="Write your reply..."
-                      rows="3"
-                    />
-                    <div className="d-flex">
-                      <button type="submit" className="glossy-button btn-sm me-2" disabled={isLoading}>
-                        Post Reply
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm"
-                        onClick={() => setReplyingTo(null)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
-                {showReplies[comment._id] && buildCommentTree(comments, comment._id, depth + 1)}
               </div>
+              {isHidden && !currentUser?.isAdmin ? null : (
+                <>
+                  {editingCommentId === comment._id ? (
+                    <form onSubmit={(e) => handleEditComment(e, comment._id)} className="mt-2">
+                      <textarea
+                        className="form-control mb-2"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        rows="3"
+                      />
+                      <div className="d-flex">
+                        <button type="submit" className="glossy-button btn-sm me-2" disabled={isLoading}>
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary btn-sm"
+                          onClick={() => setEditingCommentId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <p className="mb-2">{isHidden && currentUser?.isAdmin ? `[Hidden Comment] ${comment.text}` : comment.text}</p>
+                      <div className="d-flex">
+                        <button
+                          className="btn btn-link text-muted p-0 me-2"
+                          onClick={() => handleReplyClick(comment._id)}
+                        >
+                          <i className="bi bi-reply me-1"></i>Reply
+                        </button>
+                        <button className="btn btn-link text-muted p-0">
+                          <i className="bi bi-heart me-1"></i>Like
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+              {hasReplies && (
+                <button
+                  className="btn btn-link text-muted p-0 mt-1"
+                  onClick={() => toggleReplies(comment._id)}
+                >
+                  {showReplies[comment._id] ? `Hide Replies (${replyCount})` : `See Replies (${replyCount})`}
+                </button>
+              )}
+              {replyingTo === comment._id && (
+                <form onSubmit={(e) => handleAddComment(e, comment._id)} className="mt-3">
+                  <textarea
+                    className="form-control mb-2"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Write your reply..."
+                    rows="3"
+                  />
+                  <div className="d-flex">
+                    <button type="submit" className="glossy-button btn-sm me-2" disabled={isLoading}>
+                      Post Reply
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm"
+                      onClick={() => setReplyingTo(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+              {showReplies[comment._id] && buildCommentTree(comments, comment._id, depth + 1)}
             </div>
           </div>
-        );
-      });
+        </div>
+      );
+    });
   };
 
   return (
@@ -491,45 +552,45 @@ function CommentSection({ insightId }) {
               </button>
             </>
           )}
-        </div>
-      )}
-      <div
-        className={`modal fade ${showAuthModal ? 'show d-block' : ''}`}
-        tabIndex="-1"
-        style={{ backgroundColor: showAuthModal ? 'rgba(0,0,0,0.5)' : 'transparent' }}
-      >
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title">Authentication Required</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={() => setShowAuthModal(false)}
-              ></button>
-            </div>
-            <div className="modal-body">
-              <p>Please log in or sign up to view or post comments.</p>
-            </div>
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => navigate('/login')}
-              >
-                Log In
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline-primary"
-                onClick={() => navigate('/signup')}
-              >
-                Sign Up
-              </button>
+          <div
+            className={`modal fade ${showAuthModal ? 'show d-block' : ''}`}
+            tabIndex="-1"
+            style={{ backgroundColor: showAuthModal ? 'rgba(0,0,0,0.5)' : 'transparent' }}
+          >
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Authentication Required</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setShowAuthModal(false)}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <p>Please log in or sign up to view or post comments.</p>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => navigate('/login')}
+                  >
+                    Log In
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary"
+                    onClick={() => navigate('/signup')}
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

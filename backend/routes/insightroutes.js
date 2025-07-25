@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Insight = require('../models/Insight');
-const Comment = require('../models/Comment');
 const User = require('../models/User');
-const auth = require('../middleware/auth');
+const Comment = require('../models/Comment');
+const { auth } = require('../middleware/auth');
 
 // Initialize Socket.IO
 let io;
@@ -160,7 +160,8 @@ router.put('/:id', auth, async (req, res) => {
     if (!insight) {
       return res.status(404).json({ message: 'Insight not found' });
     }
-    if (insight.userId.toString() !== req.user.id) {
+    const user = await User.findById(req.user.id);
+    if (insight.userId.toString() !== req.user.id && !user.isAdmin) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
     insight.title = title || insight.title;
@@ -192,7 +193,8 @@ router.delete('/:id', auth, async (req, res) => {
     if (!insight) {
       return res.status(404).json({ message: 'Insight not found' });
     }
-    if (insight.userId.toString() !== req.user.id) {
+    const user = await User.findById(req.user.id);
+    if (insight.userId.toString() !== req.user.id && !user.isAdmin) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
     await Comment.deleteMany({ insightId: req.params.id });
@@ -253,128 +255,27 @@ router.post('/:insightId/vote', auth, async (req, res) => {
   }
 });
 
-// Create a comment or reply
-router.post('/:insightId/comments', auth, async (req, res) => {
-  const { text, parentCommentId } = req.body;
+// Hide or unhide an insight (admin only)
+router.put('/:id/hide', auth, async (req, res) => {
   try {
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ message: 'Comment text is required' });
+    const user = await User.findById(req.user.id);
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: 'Admin access required' });
     }
-    const insight = await Insight.findById(req.params.insightId);
+    const insight = await Insight.findById(req.params.id);
     if (!insight) {
       return res.status(404).json({ message: 'Insight not found' });
     }
-    if (insight.visibility === 'private' && insight.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Unauthorized to comment on private insight' });
-    }
-    if (parentCommentId) {
-      const parentComment = await Comment.findById(parentCommentId);
-      if (!parentComment) {
-        return res.status(404).json({ message: 'Parent comment not found' });
-      }
-      if (parentComment.insightId.toString() !== req.params.insightId) {
-        return res.status(400).json({ message: 'Parent comment does not belong to this insight' });
-      }
-    }
-    const comment = new Comment({
-      text,
-      insightId: req.params.insightId,
-      parentCommentId,
-      userId: req.user.id,
-    });
-    await comment.save();
-    insight.commentCount = (insight.commentCount || 0) + 1;
+    insight.isHidden = !insight.isHidden;
     await insight.save();
-    const populatedComment = await Comment.findById(comment._id).populate('userId', 'username profilePicture');
+    console.log(`Insight ${insight._id} ${insight.isHidden ? 'hidden' : 'unhidden'}`);
+    const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
     if (io) {
-      io.emit('newComment', {
-        ...populatedComment.toObject(),
-        insightId: req.params.insightId,
-      });
-    } else {
-      console.warn('Socket.IO instance not available for newComment event');
+      io.emit('insightUpdated', populatedInsight);
     }
-    res.status(201).json(populatedComment);
+    res.json(populatedInsight);
   } catch (error) {
-    console.error('Create comment error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Get comments for an insight
-router.get('/:insightId/comments', auth, async (req, res) => {
-  try {
-    const insight = await Insight.findById(req.params.insightId);
-    if (!insight) {
-      return res.status(404).json({ message: 'Insight not found' });
-    }
-    if (insight.visibility === 'private' && insight.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-    const comments = await Comment.find({ insightId: req.params.insightId })
-      .populate('userId', 'username profilePicture')
-      .sort({ createdAt: 1 });
-    res.json(comments);
-  } catch (error) {
-    console.error('Get comments error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Update a comment
-router.put('/comments/:commentId', auth, async (req, res) => {
-  const { text } = req.body;
-  try {
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ message: 'Comment text is required' });
-    }
-    const comment = await Comment.findById(req.params.commentId);
-    if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
-    }
-    if (comment.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-    comment.text = text;
-    comment.updatedAt = Date.now();
-    await comment.save();
-    const populatedComment = await Comment.findById(comment._id).populate('userId', 'username profilePicture');
-    if (io) {
-      io.emit('commentUpdated', populatedComment);
-    } else {
-      console.warn('Socket.IO instance not available for commentUpdated event');
-    }
-    res.json(populatedComment);
-  } catch (error) {
-    console.error('Update comment error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Delete a comment
-router.delete('/comments/:commentId', auth, async (req, res) => {
-  try {
-    const comment = await Comment.findById(req.params.commentId);
-    if (!comment) {
-      return res.status(404).json({ message: 'Comment not found' });
-    }
-    if (comment.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-    const replyCount = await Comment.countDocuments({ parentCommentId: req.params.commentId });
-    await Comment.deleteMany({ parentCommentId: req.params.commentId });
-    await Comment.deleteOne({ _id: req.params.commentId });
-    await Insight.findByIdAndUpdate(comment.insightId, {
-      $inc: { commentCount: -(1 + replyCount) },
-    });
-    if (io) {
-      io.emit('commentDeleted', { commentId: req.params.commentId, insightId: comment.insightId });
-    } else {
-      console.warn('Socket.IO instance not available for commentDeleted event');
-    }
-    res.json({ message: 'Comment and replies deleted' });
-  } catch (error) {
-    console.error('Delete comment error:', error);
+    console.error('Hide insight error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

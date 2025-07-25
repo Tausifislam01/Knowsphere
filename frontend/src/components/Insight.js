@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import FollowButton from './FollowButton';
 import CommentSection from './CommentSection';
 import BookmarkButton from './BookmarkButton';
+import ReportButton from './ReportButton';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
 const BACKEND_URL = 'http://localhost:5000';
@@ -26,14 +27,14 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
           const userVoted = insight.upvotes.includes(userId) || insight.downvotes.includes(userId);
           if (voteType === 'upvote') {
             if (insight.upvotes.includes(userId)) {
-              newStatus.upvotes = prev.upvotes - 1; // User removed upvote
+              newStatus.upvotes = prev.upvotes - 1;
             } else {
               newStatus.upvotes = prev.upvotes + (userVoted ? 0 : 1);
               newStatus.downvotes = insight.downvotes.includes(userId) ? prev.downvotes - 1 : prev.downvotes;
             }
           } else {
             if (insight.downvotes.includes(userId)) {
-              newStatus.downvotes = prev.downvotes - 1; // User removed downvote
+              newStatus.downvotes = prev.downvotes - 1;
             } else {
               newStatus.downvotes = prev.downvotes + (userVoted ? 0 : 1);
               newStatus.upvotes = insight.upvotes.includes(userId) ? prev.upvotes - 1 : prev.upvotes;
@@ -84,14 +85,28 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
     });
   };
 
-  const handleReport = () => {
-    toast.info('Report functionality coming soon', { autoClose: 2000 });
+  const handleHide = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/insights/${insight._id}/hide`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(`Insight ${data.isHidden ? 'hidden' : 'unhidden'} successfully`, { autoClose: 2000 });
+        window.dispatchEvent(new CustomEvent('insightUpdated', { detail: data }));
+      } else {
+        toast.error(data.message || 'Failed to update insight', { autoClose: 2000 });
+      }
+    } catch (error) {
+      toast.error('Error updating insight: ' + error.message, { autoClose: 2000 });
+    }
   };
 
   const tagsArray = Array.isArray(insight.tags) ? insight.tags : [];
 
   return (
-    <div className="card glossy-card mb-4" id={`insight-${insight._id}`}>
+    <div className={`card glossy-card mb-4 ${insight.isHidden ? 'bg-light opacity-50' : ''}`} id={`insight-${insight._id}`}>
       <div className="card-body position-relative">
         <div className="dropdown position-absolute top-0 end-0 mt-2 me-2">
           <button
@@ -111,24 +126,29 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
             </li>
             {currentUser && <BookmarkButton insightId={insight._id} />}
             {currentUser && currentUser._id !== insight.userId._id && (
-              <li>
-                <button className="dropdown-item" onClick={handleReport}>
-                  <i className="bi bi-flag me-2"></i>Report
-                </button>
-              </li>
+              <ReportButton itemId={insight._id} itemType="Insight" currentUser={currentUser} />
             )}
-            {currentUser && currentUser._id === insight.userId._id && onEdit && onDelete && (
+            {currentUser && (currentUser._id === insight.userId._id || currentUser.isAdmin) && (
               <>
-                <li>
-                  <button className="dropdown-item" onClick={() => onEdit(insight._id)}>
-                    <i className="bi bi-pencil-square me-2"></i>Edit
-                  </button>
-                </li>
+                {currentUser._id === insight.userId._id && onEdit && (
+                  <li>
+                    <button className="dropdown-item" onClick={() => onEdit(insight._id)}>
+                      <i className="bi bi-pencil-square me-2"></i>Edit
+                    </button>
+                  </li>
+                )}
                 <li>
                   <button className="dropdown-item text-danger" onClick={() => onDelete(insight._id)}>
                     <i className="bi bi-trash me-2"></i>Delete
                   </button>
                 </li>
+                {currentUser.isAdmin && (
+                  <li>
+                    <button className="dropdown-item" onClick={handleHide}>
+                      <i className="bi bi-eye-slash me-2"></i>{insight.isHidden ? 'Unhide' : 'Hide'}
+                    </button>
+                  </li>
+                )}
               </>
             )}
           </ul>
@@ -152,6 +172,7 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
             )}
             <small className="text-muted d-block">
               {new Date(insight.createdAt).toLocaleDateString()} • {insight.visibility}
+              {insight.isHidden && ' • Hidden'}
             </small>
           </div>
         </div>
@@ -178,19 +199,19 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
           <button
             className="glossy-button btn btn-sm me-2"
             onClick={() => handleVote('upvote')}
-            disabled={!currentUser}
+            disabled={!currentUser || insight.isHidden}
           >
             <i className="bi bi-hand-thumbs-up me-1"></i> {voteStatus.upvotes}
           </button>
           <button
             className="glossy-button btn btn-sm"
             onClick={() => handleVote('downvote')}
-            disabled={!currentUser}
+            disabled={!currentUser || insight.isHidden}
           >
             <i className="bi bi-hand-thumbs-down me-1"></i> {voteStatus.downvotes}
           </button>
         </div>
-        <CommentSection insightId={insight._id} />
+        <CommentSection insightId={insight._id} currentUser={currentUser} />
       </div>
     </div>
   );

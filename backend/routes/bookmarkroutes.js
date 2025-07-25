@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Bookmark = require('../models/Bookmark');
 const Insight = require('../models/Insight');
-const auth = require('../middleware/auth');
+const { auth, adminAuth } = require('../middleware/auth');
 
 // Create a bookmark
 router.post('/', auth, async (req, res) => {
@@ -28,7 +28,6 @@ router.post('/', auth, async (req, res) => {
       path: 'insightId',
       populate: { path: 'userId', select: 'username profilePicture' },
     });
-    // Emit Socket.IO event if io is available
     if (req.io) {
       req.io.emit('bookmarkAdded', { userId: req.user.id, insightId });
     } else {
@@ -55,6 +54,20 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// Get all bookmarks (admin only)
+router.get('/all', auth, adminAuth, async (req, res) => {
+  try {
+    const bookmarks = await Bookmark.find().populate({
+      path: 'insightId',
+      populate: { path: 'userId', select: 'username profilePicture' },
+    }).populate('userId', 'username');
+    res.json(bookmarks);
+  } catch (error) {
+    console.error('Fetch all bookmarks error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Delete a bookmark
 router.delete('/:insightId', auth, async (req, res) => {
   try {
@@ -63,7 +76,6 @@ router.delete('/:insightId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Bookmark not found' });
     }
     await Bookmark.deleteOne({ _id: bookmark._id });
-    // Emit Socket.IO event if io is available
     if (req.io) {
       req.io.emit('bookmarkRemoved', { userId: req.user.id, insightId: req.params.insightId });
     } else {
