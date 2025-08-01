@@ -26,7 +26,8 @@ const normalizeTags = (tags) => {
 // Get user-specific insights
 router.get('/', auth, async (req, res) => {
   try {
-    const insights = await Insight.find({ userId: req.user.id }).populate('userId', 'username profilePicture');
+    const insights = await Insight.find({ userId: req.user.id })
+      .populate('userId', 'username profilePicture');
     res.json(insights);
   } catch (error) {
     console.error('Get user insights error:', error);
@@ -37,7 +38,7 @@ router.get('/', auth, async (req, res) => {
 // Get public insights
 router.get('/public', async (req, res) => {
   try {
-    const insights = await Insight.find({ visibility: 'public' })
+    const insights = await Insight.find({ visibility: 'public', isHidden: false })
       .sort({ createdAt: -1 })
       .populate('userId', 'username profilePicture');
     res.json(insights);
@@ -58,8 +59,8 @@ router.get('/followed', auth, async (req, res) => {
     const followedTags = user.followedTags || [];
     const insights = await Insight.find({
       $or: [
-        { userId: { $in: followedUsers }, visibility: { $in: ['public', 'followers'] } },
-        { tags: { $in: followedTags }, visibility: 'public' },
+        { userId: { $in: followedUsers }, visibility: { $in: ['public', 'followers'] }, isHidden: false },
+        { tags: { $in: followedTags }, visibility: 'public', isHidden: false },
       ],
     })
       .populate('userId', 'username profilePicture')
@@ -78,6 +79,7 @@ router.get('/tags/:tag', auth, async (req, res) => {
     const insights = await Insight.find({
       tags: tag,
       visibility: 'public',
+      isHidden: false,
     })
       .populate('userId', 'username profilePicture')
       .sort({ createdAt: -1 });
@@ -95,7 +97,11 @@ router.get('/:id', auth, async (req, res) => {
     if (!insight) {
       return res.status(404).json({ message: 'Insight not found' });
     }
-    if (insight.visibility === 'private' && insight.userId.toString() !== req.user.id) {
+    const user = await User.findById(req.user.id);
+    if (insight.isHidden && insight.userId.toString() !== req.user.id && !user.isAdmin) {
+      return res.status(404).json({ message: 'Insight not found' });
+    }
+    if (insight.visibility === 'private' && insight.userId.toString() !== req.user.id && !user.isAdmin) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
     res.json(insight);
@@ -108,7 +114,14 @@ router.get('/:id', auth, async (req, res) => {
 // Get insights by user ID
 router.get('/user/:userId', auth, async (req, res) => {
   try {
-    const insights = await Insight.find({ userId: req.params.userId })
+    const user = await User.findById(req.user.id);
+    const targetUserId = req.params.userId;
+    const isSelf = targetUserId === req.user.id;
+    const isAdmin = user.isAdmin;
+    const query = isSelf || isAdmin
+      ? { userId: targetUserId }
+      : { userId: targetUserId, visibility: 'public', isHidden: false };
+    const insights = await Insight.find(query)
       .populate('userId', 'username profilePicture')
       .sort({ createdAt: -1 });
     res.json(insights);
@@ -220,6 +233,9 @@ router.post('/:insightId/vote', auth, async (req, res) => {
     }
     const insight = await Insight.findById(req.params.insightId);
     if (!insight) {
+      return res.status(404).json({ message: 'Insight not found' });
+    }
+    if (insight.isHidden && insight.userId.toString() !== req.user.id) {
       return res.status(404).json({ message: 'Insight not found' });
     }
     if (insight.visibility === 'private' && insight.userId.toString() !== req.user.id) {

@@ -1,408 +1,444 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { getReports, resolveReport, deleteInsight, hideComment, banUser, unbanUser } from '../utils/api';
+import {
+  fetchReports, resolveReport,
+  fetchReportedInsights, hideInsight, deleteInsight,
+  fetchReportedComments, hideComment, deleteComment
+} from '../utils/api';
 
-const AdminDashboard = ({ currentUser }) => {
-  const [users, setUsers] = useState([]);
+function AdminDashboard({ currentUser }) {
+  const [activeTab, setActiveTab] = useState('reports');
   const [reports, setReports] = useState([]);
-  const [insights, setInsights] = useState([]);
-  const [comments, setComments] = useState([]);
+  const [reportedInsights, setReportedInsights] = useState([]);
+  const [reportedComments, setReportedComments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
 
   useEffect(() => {
-    console.log('AdminDashboard - currentUser:', currentUser);
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const decoded = JSON.parse(atob(token.split('.')[1]));
-        console.log('AdminDashboard - Decoded token:', decoded);
-      } catch (err) {
-        console.error('AdminDashboard - Token decode error:', err.message);
-      }
-    } else {
-      console.log('AdminDashboard - No token found, redirecting to login');
-      navigate('/login');
+    if (!currentUser || !currentUser.isAdmin) {
       return;
     }
 
-    if (currentUser && !currentUser.isAdmin) {
-      console.log('AdminDashboard - Access denied, redirecting. isAdmin:', currentUser.isAdmin);
-      toast.error('Access denied: Admins only', { autoClose: 2000 });
-      navigate('/');
-      return;
-    }
-
-    if (!currentUser) {
-      console.log('AdminDashboard - Waiting for currentUser');
-      return;
-    }
-
-    const fetchData = async () => {
+    const loadData = async () => {
       setIsLoading(true);
-      setError('');
       try {
-        const usersResponse = await fetch('http://localhost:5000/api/admin/users', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        console.log('Users API response status:', usersResponse.status);
-        if (!usersResponse.ok) {
-          throw new Error(`Users API error: ${usersResponse.status} ${usersResponse.statusText}`);
+        if (activeTab === 'reports') {
+          const reportData = await fetchReports();
+          console.log('Fetched reports:', reportData);
+          if (reportData.length === 0) {
+            console.log('No pending reports found');
+          } else {
+            reportData.forEach(report => {
+              if (!report.reportedItemId) {
+                console.warn(`Report ${report._id} has no reportedItemId`);
+              }
+            });
+            setReports(reportData); // No deduplication to allow multiple reports
+          }
+        } else if (activeTab === 'insights') {
+          const insightData = await fetchReportedInsights();
+          setReportedInsights(insightData);
+        } else if (activeTab === 'comments') {
+          const commentData = await fetchReportedComments();
+          setReportedComments(commentData);
         }
-        const usersData = await usersResponse.json();
-        console.log('Users API response data:', usersData);
-        setUsers(usersData);
-
-        const reportsData = await getReports();
-        console.log('Reports API response data:', reportsData);
-        setReports(reportsData);
-
-        const insightIds = reportsData
-          .filter(r => r.reportedItemType === 'Insight')
-          .map(r => r.reportedItemId);
-        console.log('Reported insight IDs:', insightIds);
-        const insightPromises = insightIds.map(id =>
-          fetch(`http://localhost:5000/api/insights/${id}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-          }).then(res => res.json())
-        );
-        const insightsData = await Promise.all(insightPromises);
-        console.log('Reported insights data:', insightsData);
-        setInsights(insightsData.filter(i => i && i._id));
-
-        const commentIds = reportsData
-          .filter(r => r.reportedItemType === 'Comment')
-          .map(r => r.reportedItemId);
-        console.log('Reported comment IDs:', commentIds);
-        const commentPromises = commentIds.map(id =>
-          fetch(`http://localhost:5000/api/insights/comments/${id}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-          }).then(res => res.json())
-        );
-        const commentsData = await Promise.all(commentPromises);
-        console.log('Reported comments data:', commentsData);
-        setComments(commentsData.filter(c => c && c._id));
-      } catch (err) {
-        console.error('Fetch data error:', err.message);
-        setError(`Error fetching data: ${err.message}`);
-        toast.error(`Error fetching data: ${err.message}`, { autoClose: 2000 });
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast.error(`Error loading ${activeTab}: ${error.message}`, { autoClose: 2000 });
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, [currentUser, navigate]);
+    loadData();
+  }, [activeTab, currentUser]);
 
-  const handleBanUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to ban this user?')) return;
-    try {
-      await banUser(userId);
-      setUsers(users.map(u => u._id === userId ? { ...u, isBanned: true } : u));
-      toast.success('User banned successfully', { autoClose: 2000 });
-    } catch (err) {
-      console.error('Ban user error:', err.message);
-      toast.error(`Error banning user: ${err.message}`, { autoClose: 2000 });
+  const addToReportedTab = (report) => {
+    if (!report.reportedItemId) {
+      console.warn(`Cannot add item to reported tab: report ${report._id} has no reportedItemId`);
+      return;
+    }
+    if (report.reportedItemType === 'Insight') {
+      const exists = reportedInsights.findIndex(insight => insight._id === report.reportedItemId._id) !== -1;
+      if (!exists) {
+        setReportedInsights([...reportedInsights, { ...report.reportedItemId, isHidden: report.reportedItemId.isHidden || false }]);
+      }
+    } else {
+      const exists = reportedComments.findIndex(comment => comment._id === report.reportedItemId._id) !== -1;
+      if (!exists) {
+        setReportedComments([...reportedComments, { ...report.reportedItemId, isHidden: report.reportedItemId.isHidden || false }]);
+      }
     }
   };
 
-  const handleUnbanUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to unban this user?')) return;
+  const handleResolveReport = async (reportId, status, report) => {
     try {
-      await unbanUser(userId);
-      setUsers(users.map(u => u._id === userId ? { ...u, isBanned: false } : u));
-      toast.success('User unbanned successfully', { autoClose: 2000 });
-    } catch (err) {
-      console.error('Unban user error:', err.message);
-      toast.error(`Error unbanning user: ${err.message}`, { autoClose: 2000 });
-    }
-  };
-
-  const handleResolveReport = async (reportId) => {
-    try {
-      await resolveReport(reportId, 'resolved');
+      const response = await resolveReport(reportId, status);
+      console.log(`Resolve report response:`, response);
+      toast.success(`Report ${status} successfully`, { autoClose: 2000 });
+      addToReportedTab(report);
       setReports(reports.filter(r => r._id !== reportId));
-      const resolvedReport = reports.find(r => r._id === reportId);
-      if (resolvedReport.reportedItemType === 'Insight') {
-        setInsights(insights.filter(i => i._id !== resolvedReport.reportedItemId));
-      } else if (resolvedReport.reportedItemType === 'Comment') {
-        setComments(comments.filter(c => c._id !== resolvedReport.reportedItemId));
-      }
-      toast.success('Report resolved', { autoClose: 2000 });
-    } catch (err) {
-      console.error('Resolve report error:', err.message);
-      toast.error(`Error resolving report: ${err.message}`, { autoClose: 2000 });
+    } catch (error) {
+      console.error(`Error ${status} report:`, error);
+      toast.error(`Error ${status} report: ${error.message}`, { autoClose: 2000 });
     }
   };
 
-  const handleHideContent = async (itemId, itemType) => {
+  const handleHideItem = async (report, hide = true) => {
     try {
-      if (itemType === 'Insight') {
-        await fetch(`http://localhost:5000/api/insights/${itemId}/hide`, {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        setInsights(insights.map(i => i._id === itemId ? { ...i, isHidden: true } : i));
+      if (report.reportedItemType === 'Insight') {
+        const response = await hideInsight(report.reportedItemId._id);
+        console.log(`Hide insight response:`, response);
+        toast.success(`Insight ${hide ? 'hidden' : 'unhidden'} successfully`, { autoClose: 2000 });
+        const exists = reportedInsights.findIndex(insight => insight._id === report.reportedItemId._id);
+        if (exists === -1) {
+          setReportedInsights([...reportedInsights, { ...report.reportedItemId, isHidden: hide }]);
+        } else {
+          setReportedInsights(reportedInsights.map(insight =>
+            insight._id === report.reportedItemId._id ? { ...insight, isHidden: hide } : insight
+          ));
+        }
       } else {
-        await hideComment(itemId);
-        setComments(comments.map(c => c._id === itemId ? { ...c, isHidden: true } : c));
+        const response = await hideComment(report.reportedItemId._id);
+        console.log(`Hide comment response:`, response);
+        toast.success(`Comment ${hide ? 'hidden' : 'unhidden'} successfully`, { autoClose: 2000 });
+        const exists = reportedComments.findIndex(comment => comment._id === report.reportedItemId._id);
+        if (exists === -1) {
+          setReportedComments([...reportedComments, { ...report.reportedItemId, isHidden: hide }]);
+        } else {
+          setReportedComments(reportedComments.map(comment =>
+            comment._id === report.reportedItemId._id ? { ...comment, isHidden: hide } : comment
+          ));
+        }
       }
-      toast.success(`${itemType} hidden successfully`, { autoClose: 2000 });
-    } catch (err) {
-      console.error(`Hide ${itemType} error:`, err.message);
-      toast.error(`Error hiding ${itemType.toLowerCase()}: ${err.message}`, { autoClose: 2000 });
+      setReports(reports.filter(r => r._id !== report._id));
+    } catch (error) {
+      console.error(`Error ${hide ? 'hiding' : 'unhiding'} item:`, error);
+      toast.error(`Error ${hide ? 'hiding' : 'unhiding'} ${report.reportedItemType.toLowerCase()}: ${error.message}`, { autoClose: 2000 });
     }
   };
 
-  const handleDeleteContent = async (itemId, itemType) => {
-    if (!window.confirm(`Are you sure you want to delete this ${itemType.toLowerCase()}?`)) return;
+  const handleDeleteItem = async (report) => {
+    if (!window.confirm(`Are you sure you want to delete this ${report.reportedItemType.toLowerCase()}?`)) return;
     try {
-      if (itemType === 'Insight') {
-        await deleteInsight(itemId);
-        setInsights(insights.filter(i => i._id !== itemId));
+      if (report.reportedItemType === 'Insight') {
+        const response = await deleteInsight(report.reportedItemId._id);
+        console.log(`Delete insight response:`, response);
+        toast.success('Insight deleted successfully', { autoClose: 2000 });
+        setReportedInsights(reportedInsights.filter(insight => insight._id !== report.reportedItemId._id));
       } else {
-        await fetch(`http://localhost:5000/api/insights/comments/${itemId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        setComments(comments.filter(c => c._id !== itemId));
+        const response = await deleteComment(report.reportedItemId._id);
+        console.log(`Delete comment response:`, response);
+        toast.success('Comment deleted successfully', { autoClose: 2000 });
+        setReportedComments(reportedComments.filter(comment => comment._id !== report.reportedItemId._id));
       }
-      toast.success(`${itemType} deleted successfully`, { autoClose: 2000 });
-    } catch (err) {
-      console.error(`Delete ${itemType} error:`, err.message);
-      toast.error(`Error deleting ${itemType.toLowerCase()}: ${err.message}`, { autoClose: 2000 });
+      setReports(reports.filter(r => r._id !== report._id));
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      toast.error(`Error deleting ${report.reportedItemType.toLowerCase()}: ${error.message}`, { autoClose: 2000 });
+      addToReportedTab(report);
     }
   };
 
-  if (!currentUser) {
-    console.log('AdminDashboard - Rendering null until currentUser is loaded');
-    return null;
+  const handleHideInsight = async (insightId, isHidden) => {
+    try {
+      const response = await hideInsight(insightId);
+      console.log(`Hide/unhide insight response:`, response);
+      toast.success(`Insight ${isHidden ? 'unhidden' : 'hidden'} successfully`, { autoClose: 2000 });
+      setReportedInsights(reportedInsights.map(insight =>
+        insight._id === insightId ? { ...insight, isHidden: !isHidden } : insight
+      ));
+    } catch (error) {
+      console.error('Error hiding/unhiding insight:', error);
+      toast.error(`Error ${isHidden ? 'unhiding' : 'hiding'} insight: ${error.message}`, { autoClose: 2000 });
+    }
+  };
+
+  const handleDeleteInsight = async (insightId) => {
+    if (!window.confirm('Are you sure you want to delete this insight?')) return;
+    try {
+      const response = await deleteInsight(insightId);
+      console.log(`Delete insight response:`, response);
+      toast.success('Insight deleted successfully', { autoClose: 2000 });
+      setReportedInsights(reportedInsights.filter(insight => insight._id !== insightId));
+    } catch (error) {
+      console.error('Error deleting insight:', error);
+      toast.error(`Error deleting insight: ${error.message}`, { autoClose: 2000 });
+    }
+  };
+
+  const handleHideComment = async (commentId, isHidden) => {
+    try {
+      const response = await hideComment(commentId);
+      console.log(`Hide/unhide comment response:`, response);
+      toast.success(`Comment ${isHidden ? 'unhidden' : 'hidden'} successfully`, { autoClose: 2000 });
+      setReportedComments(reportedComments.map(comment =>
+        comment._id === commentId ? { ...comment, isHidden: !isHidden } : comment
+      ));
+    } catch (error) {
+      console.error('Error hiding/unhiding comment:', error);
+      toast.error(`Error ${isHidden ? 'unhiding' : 'hiding'} comment: ${error.message}`, { autoClose: 2000 });
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return;
+    try {
+      const response = await deleteComment(commentId);
+      console.log(`Delete comment response:`, response);
+      toast.success('Comment deleted successfully', { autoClose: 2000 });
+      setReportedComments(reportedComments.filter(comment => comment._id !== commentId));
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      toast.error(`Error deleting comment: ${error.message}`, { autoClose: 2000 });
+    }
+  };
+
+  if (!currentUser || !currentUser.isAdmin) {
+    return <div className="alert alert-danger">Access Denied: Admins only</div>;
   }
 
   return (
-    <div className="container py-4">
-      <h1 className="display-5 fw-bold mb-4 text-primary">
-        <i className="bi bi-shield-lock me-2"></i>Admin Dashboard
-      </h1>
-      {error && (
-        <div className="alert alert-danger d-flex align-items-center mb-4">
-          <i className="bi bi-exclamation-triangle-fill me-2"></i>
-          <div>{error}</div>
-        </div>
-      )}
+    <div className="container mt-5">
+      <h2 className="mb-4">Admin Dashboard</h2>
+      <ul className="nav nav-tabs mb-4">
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reports')}
+            style={{ color: 'black' }}
+          >
+            Pending Reports
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === 'insights' ? 'active' : ''}`}
+            onClick={() => setActiveTab('insights')}
+            style={{ color: 'black' }}
+          >
+            Reported Insights
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === 'comments' ? 'active' : ''}`}
+            onClick={() => setActiveTab('comments')}
+            style={{ color: 'black' }}
+          >
+            Logs
+          </button>
+        </li>
+      </ul>
+
       {isLoading ? (
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }} role="status">
+        <div className="text-center py-4">
+          <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
-          <p className="mt-3">Loading data...</p>
         </div>
       ) : (
         <>
-          <div className="card glossy-card mb-4">
-            <div className="card-body">
-              <h3 className="card-title mb-4">Manage Users</h3>
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Username</th>
-                      <th>Email</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.length === 0 ? (
+          {activeTab === 'reports' && (
+            <div className="card glossy-card">
+              <div className="card-body">
+                <h5 className="card-title">Pending Reports</h5>
+                {reports.length === 0 ? (
+                  <div className="alert alert-info">No reports to check</div>
+                ) : (
+                  <table className="table table-striped">
+                    <thead>
                       <tr>
-                        <td colSpan="4">No users available</td>
+                        <th>Reported Item</th>
+                        <th>Reason</th>
+                        <th>Reported By</th>
+                        <th>Actions</th>
                       </tr>
-                    ) : (
-                      users.map(user => (
-                        <tr key={user._id}>
-                          <td>{user.username}</td>
-                          <td>{user.email}</td>
-                          <td>{user.isBanned ? 'Banned' : 'Active'}</td>
+                    </thead>
+                    <tbody>
+                      {reports.map(report => (
+                        <tr key={report._id}>
                           <td>
-                            {user.isBanned ? (
-                              <button
-                                className="glossy-button btn-sm"
-                                onClick={() => handleUnbanUser(user._id)}
-                              >
-                                Unban
-                              </button>
+                            {report.reportedItemType === 'Insight' ? (
+                              report.reportedItemId ? (
+                                <Link
+                                  to={`/insights/${report.reportedItemId._id}`}
+                                  className="text-decoration-none"
+                                >
+                                  {report.reportedItemId.title || 'Untitled Insight'}
+                                </Link>
+                              ) : (
+                                'Insight not found'
+                              )
                             ) : (
-                              <button
-                                className="glossy-button btn-sm bg-danger"
-                                onClick={() => handleBanUser(user._id)}
-                              >
-                                Ban
-                              </button>
+                              report.reportedItemId ? (
+                                <Link
+                                  to={`/insights/${report.reportedItemId.insightId}?commentId=${report.reportedItemId._id}`}
+                                  className="text-decoration-none"
+                                >
+                                  {report.reportedItemId.text?.substring(0, 50) || 'Comment not found'}...
+                                </Link>
+                              ) : (
+                                'Comment not found'
+                              )
                             )}
                           </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div className="card glossy-card mb-4">
-            <div className="card-body">
-              <h3 className="card-title mb-4">Manage Reports</h3>
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Item Type</th>
-                      <th>Reported By</th>
-                      <th>Reason</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reports.length === 0 ? (
-                      <tr>
-                        <td colSpan="4">No reports available</td>
-                      </tr>
-                    ) : (
-                      reports.map(report => (
-                        <tr key={report._id}>
-                          <td>{report.reportedItemType}</td>
-                          <td>{report.reporterId?.username || 'Unknown'}</td>
-                          <td>{report.reason}</td>
+                          <td>{report.reason || 'No reason provided'}</td>
+                          <td>{report.reporterId?.username || 'Anonymous'}</td>
                           <td>
                             <button
-                              className="glossy-button btn-sm me-2"
-                              onClick={() => handleResolveReport(report._id)}
+                              className="glossy-button btn-sm btn-primary me-1"
+                              onClick={() => handleResolveReport(report._id, 'resolved', report)}
                             >
                               Resolve
                             </button>
                             <button
-                              className="glossy-button btn-sm bg-warning me-2"
-                              onClick={() => handleHideContent(report.reportedItemId, report.reportedItemType)}
+                              className="glossy-button btn-sm btn-secondary me-1"
+                              onClick={() => handleResolveReport(report._id, 'dismissed', report)}
                             >
-                              Hide
+                              Dismiss
                             </button>
+                            {report.reportedItemId && report.reportedItemId.isHidden ? (
+                              <button
+                                className="glossy-button btn-sm btn-success me-1"
+                                onClick={() => handleHideItem(report, false)}
+                              >
+                                Unhide
+                              </button>
+                            ) : (
+                              <button
+                                className="glossy-button btn-sm btn-warning me-1"
+                                onClick={() => handleHideItem(report, true)}
+                              >
+                                Hide
+                              </button>
+                            )}
                             <button
-                              className="glossy-button btn-sm bg-danger"
-                              onClick={() => handleDeleteContent(report.reportedItemId, report.reportedItemType)}
+                              className="glossy-button btn-sm btn-danger"
+                              onClick={() => handleDeleteItem(report)}
                             >
                               Delete
                             </button>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
-          <div className="card glossy-card mb-4">
-            <div className="card-body">
-              <h3 className="card-title mb-4">Manage Reported Insights</h3>
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Title</th>
-                      <th>Author</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {insights.length === 0 ? (
+          {activeTab === 'insights' && (
+            <div className="card glossy-card">
+              <div className="card-body">
+                <h5 className="card-title">Reported Insights</h5>
+                {reportedInsights.length === 0 ? (
+                  <div className="alert alert-info">No reported insights to display</div>
+                ) : (
+                  <table className="table table-striped">
+                    <thead>
                       <tr>
-                        <td colSpan="4">No reported insights available</td>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                       </tr>
-                    ) : (
-                      insights.map(insight => (
+                    </thead>
+                    <tbody>
+                      {reportedInsights.map(insight => (
                         <tr key={insight._id}>
-                          <td>{insight.title}</td>
-                          <td>{insight.userId?.username || 'Unknown'}</td>
+                          <td>
+                            <Link to={`/insights/${insight._id}`} className="text-decoration-none">
+                              {insight.title}
+                            </Link>
+                          </td>
+                          <td>{insight.userId?.username || 'N/A'}</td>
                           <td>{insight.isHidden ? 'Hidden' : 'Visible'}</td>
                           <td>
                             <button
-                              className="glossy-button btn-sm bg-warning me-2"
-                              onClick={() => handleHideContent(insight._id, 'Insight')}
+                              className="glossy-button btn-sm btn-warning me-2"
+                              onClick={() => handleHideInsight(insight._id, insight.isHidden)}
                             >
                               {insight.isHidden ? 'Unhide' : 'Hide'}
                             </button>
                             <button
-                              className="glossy-button btn-sm bg-danger"
-                              onClick={() => handleDeleteContent(insight._id, 'Insight')}
+                              className="glossy-button btn-sm btn-danger"
+                              onClick={() => handleDeleteInsight(insight._id)}
                             >
                               Delete
                             </button>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
-          <div className="card glossy-card">
-            <div className="card-body">
-              <h3 className="card-title mb-4">Manage Reported Comments</h3>
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Text</th>
-                      <th>Author</th>
-                      <th>Insight</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {comments.length === 0 ? (
+          {activeTab === 'comments' && (
+            <div className="card glossy-card">
+              <div className="card-body">
+                <h5 className="card-title">Logs</h5>
+                {reportedComments.length === 0 ? (
+                  <div className="alert alert-info">No logs to display</div>
+                ) : (
+                  <table className="table table-striped">
+                    <thead>
                       <tr>
-                        <td colSpan="5">No reported comments available</td>
+                        <th>Comment</th>
+                        <th>Author</th>
+                        <th>Insight</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                       </tr>
-                    ) : (
-                      comments.map(comment => (
+                    </thead>
+                    <tbody>
+                      {reportedComments.map(comment => (
                         <tr key={comment._id}>
-                          <td>{comment.text?.substring(0, 50) || 'No text'}...</td>
-                          <td>{comment.userId?.username || 'Unknown'}</td>
-                          <td>{comment.insightId?.title || 'Unknown'}</td>
+                          <td>
+                            <Link
+                              to={`/insights/${comment.insightId}?commentId=${comment._id}`}
+                              className="text-decoration-none"
+                            >
+                              {comment.text.substring(0, 50)}...
+                            </Link>
+                          </td>
+                          <td>{comment.userId?.username || 'N/A'}</td>
+                          <td>
+                            <Link to={`/insights/${comment.insightId}`} className="text-decoration-none">
+                              Insight
+                            </Link>
+                          </td>
                           <td>{comment.isHidden ? 'Hidden' : 'Visible'}</td>
                           <td>
                             <button
-                              className="glossy-button btn-sm bg-warning me-2"
-                              onClick={() => handleHideContent(comment._id, 'Comment')}
+                              className="glossy-button btn-sm btn-warning me-2"
+                              onClick={() => handleHideComment(comment._id, comment.isHidden)}
                             >
                               {comment.isHidden ? 'Unhide' : 'Hide'}
                             </button>
                             <button
-                              className="glossy-button btn-sm bg-danger"
-                              onClick={() => handleDeleteContent(comment._id, 'Comment')}
+                              className="glossy-button btn-sm btn-danger"
+                              onClick={() => handleDeleteComment(comment._id)}
                             >
                               Delete
                             </button>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </div>
   );
-};
+}
 
 export default AdminDashboard;

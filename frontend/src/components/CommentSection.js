@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import ReportButton from './ReportButton';
@@ -13,7 +13,6 @@ function CommentSection({ insightId, currentUser }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [error, setError] = useState('');
-  const [userId] = useState(localStorage.getItem('userId'));
   const [token] = useState(localStorage.getItem('token'));
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState('');
@@ -24,24 +23,32 @@ function CommentSection({ insightId, currentUser }) {
   const [displayedComments, setDisplayedComments] = useState(5);
   const [showReplies, setShowReplies] = useState({});
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchComments = async () => {
       setIsLoading(true);
       try {
         console.log('Fetching comments from:', `${BACKEND_URL}/api/insights/${insightId}/comments`);
-        const response = await fetch(`${BACKEND_URL}/api/insights/${insightId}/comments`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(`${BACKEND_URL}/api/insights/${insightId}/comments`, { headers });
         if (!response.ok) {
           const text = await response.text();
           console.log('Fetch comments response:', { status: response.status, body: text });
+          if (response.status === 401) {
+            setShowAuthModal(true);
+            setError('Please log in to view all comments');
+            toast.error('Please log in to view all comments', { autoClose: 2000 });
+            setComments([]);
+            return;
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         console.log('Fetched comments:', data);
-        setComments(data);
+        setComments(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Fetch comments error:', error);
         setError(`Error: ${error.message}`);
@@ -51,10 +58,26 @@ function CommentSection({ insightId, currentUser }) {
       }
     };
 
-    if (insightId && showComments && token) {
+    const params = new URLSearchParams(location.search);
+    const commentId = params.get('commentId');
+    if (insightId && (showComments || commentId)) {
+      setShowComments(true);
       fetchComments();
-    } else if (showComments && !token) {
+    } else if ((showComments || commentId) && !token) {
       setShowAuthModal(true);
+    }
+
+    if (commentId && showComments) {
+      setTimeout(() => {
+        const commentElement = document.getElementById(`comment-${commentId}`);
+        if (commentElement) {
+          commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          commentElement.style.backgroundColor = '#fff3cd';
+          setTimeout(() => {
+            commentElement.style.backgroundColor = '';
+          }, 2000);
+        }
+      }, 500);
     }
 
     socket.on('newComment', (comment) => {
@@ -81,7 +104,7 @@ function CommentSection({ insightId, currentUser }) {
       socket.off('newComment');
       socket.off('commentUpdated');
     };
-  }, [insightId, showComments, token]);
+  }, [insightId, showComments, token, location.search]);
 
   const handleAddComment = async (e, parentCommentId = null) => {
     e.preventDefault();
@@ -291,18 +314,37 @@ function CommentSection({ insightId, currentUser }) {
     }
   };
 
+  const closeDropdown = (commentId) => {
+    const dropdownMenu = document.querySelector(`#dropdownMenuButton-${commentId} + .dropdown-menu`);
+    if (dropdownMenu) {
+      dropdownMenu.classList.remove('show');
+    }
+  };
+
   const topLevelComments = comments.filter(c => !c.parentCommentId);
+  console.log('Top-level comments:', topLevelComments);
 
   const buildCommentTree = (comments, parentId = null, depth = 0, isTopLevel = false) => {
     const filteredComments = comments.filter(comment => (comment.parentCommentId || null) === parentId);
+    console.log(`Building comment tree for parentId: ${parentId || 'null'}, depth: ${depth}, comments:`, filteredComments);
     const displayCount = isTopLevel ? displayedComments : filteredComments.length;
     return filteredComments.slice(0, displayCount).map(comment => {
       const hasReplies = comments.some(c => c.parentCommentId === comment._id);
       const replyCount = comments.filter(c => c.parentCommentId === comment._id).length;
       const isHidden = comment.isHidden && !currentUser?.isAdmin;
 
+      // Ensure comment has required fields
+      if (!comment._id || !comment.text) {
+        console.warn('Invalid comment data:', comment);
+        return null;
+      }
+
       return (
-        <div key={comment._id} className={`mb-3 ${depth > 0 ? 'ps-4 border-start border-2 border-light' : ''}`}>
+        <div
+          key={comment._id}
+          id={`comment-${comment._id}`}
+          className={`mb-3 ${depth > 0 ? 'ps-4 border-start border-2 border-light' : ''}`}
+        >
           <div className="d-flex">
             <img
               src={comment.userId?.profilePicture || 'https://via.placeholder.com/40'}
@@ -330,10 +372,11 @@ function CommentSection({ insightId, currentUser }) {
                       className="btn btn-sm btn-link text-muted p-0"
                       data-bs-toggle="dropdown"
                       aria-expanded="false"
+                      id={`dropdownMenuButton-${comment._id}`}
                     >
                       <i className="bi bi-three-dots"></i>
                     </button>
-                    <ul className="dropdown-menu">
+                    <ul className="dropdown-menu" aria-labelledby={`dropdownMenuButton-${comment._id}`}>
                       {currentUser._id === comment.userId?._id && (
                         <>
                           <li>
@@ -355,7 +398,17 @@ function CommentSection({ insightId, currentUser }) {
                         </>
                       )}
                       {currentUser._id !== comment.userId?._id && !isHidden && (
-                        <ReportButton itemId={comment._id} itemType="Comment" currentUser={currentUser} />
+                        <li>
+                          <button
+                            className="dropdown-item"
+                            onClick={() => {
+                              setShowReportForm(comment._id);
+                              closeDropdown(comment._id);
+                            }}
+                          >
+                            <i className="bi bi-flag me-2"></i>Report
+                          </button>
+                        </li>
                       )}
                       {currentUser.isAdmin && (
                         <>
@@ -458,11 +511,21 @@ function CommentSection({ insightId, currentUser }) {
           </div>
         </div>
       );
-    });
+    }).filter(Boolean); // Remove null entries from invalid comments
   };
+
+  console.log('Rendering comments-list with comments:', comments);
 
   return (
     <div className="mt-3 comment-section">
+      {showReportForm && (
+        <ReportButton
+          itemId={showReportForm}
+          itemType="Comment"
+          currentUser={currentUser}
+          onClose={() => setShowReportForm(null)}
+        />
+      )}
       {!showComments ? (
         <button
           className="btn btn-outline-primary btn-sm show-comments-btn"
@@ -519,16 +582,14 @@ function CommentSection({ insightId, currentUser }) {
               {error && (
                 <div className="alert alert-danger py-2">{error}</div>
               )}
-              {token ? (
-                <div className="comments-list">
-                  {buildCommentTree(comments, null, 0, true)}
-                </div>
-              ) : (
-                <div className="alert alert-info py-2">
-                  Please log in or sign up to view comments.
-                </div>
-              )}
-              {token && topLevelComments.length > displayedComments && (
+              <div className="comments-list">
+                {comments.length === 0 ? (
+                  <p className="text-muted">No comments yet.</p>
+                ) : (
+                  buildCommentTree(comments, null, 0, true)
+                )}
+              </div>
+              {topLevelComments.length > displayedComments && (
                 <div className="mt-2 d-flex gap-2">
                   <button
                     className="btn btn-outline-primary btn-sm"

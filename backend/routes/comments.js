@@ -17,12 +17,18 @@ router.post('/:insightId/comments', auth, async (req, res) => {
     if (!insight) {
       return res.status(404).json({ message: 'Insight not found' });
     }
+    if (insight.isHidden && insight.userId.toString() !== req.user.id) {
+      return res.status(404).json({ message: 'Insight not found' });
+    }
     if (insight.visibility === 'private' && insight.userId.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Unauthorized to comment on private insight' });
     }
     if (parentCommentId) {
       const parentComment = await Comment.findById(parentCommentId);
       if (!parentComment) {
+        return res.status(404).json({ message: 'Parent comment not found' });
+      }
+      if (parentComment.isHidden && insight.userId.toString() !== req.user.id) {
         return res.status(404).json({ message: 'Parent comment not found' });
       }
     }
@@ -44,12 +50,33 @@ router.post('/:insightId/comments', auth, async (req, res) => {
 });
 
 // GET /api/insights/:insightId/comments - Fetch comments for an insight
-router.get('/:insightId/comments', auth, async (req, res) => {
+router.get('/:insightId/comments', async (req, res) => {
   try {
     const { insightId } = req.params;
-    const comments = await Comment.find({ insightId })
+    const insight = await Insight.findById(insightId);
+    if (!insight) {
+      return res.status(404).json({ message: 'Insight not found' });
+    }
+    // Allow admins or insight owners to see hidden comments
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    let user = null;
+    if (token) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        user = await User.findById(decoded.user.id);
+      } catch (error) {
+        console.warn('Invalid token provided:', error.message);
+      }
+    }
+    const query = { insightId, isHidden: false };
+    if (user && (user.isAdmin || insight.userId.toString() === user._id.toString())) {
+      delete query.isHidden; // Admins/owners see all comments
+    }
+    const comments = await Comment.find(query)
       .populate('userId', 'username profilePicture')
       .sort({ createdAt: -1 });
+    console.log(`Fetched ${comments.length} comments for insight ${insightId}`);
     res.json(comments);
   } catch (error) {
     console.error('Fetch comments error:', error);
@@ -65,6 +92,9 @@ router.get('/comments/:id', auth, async (req, res) => {
       .populate('insightId', 'title');
     if (!comment) {
       console.log('Comment not found:', req.params.id);
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+    if (comment.isHidden && comment.insightId.userId.toString() !== req.user.id) {
       return res.status(404).json({ message: 'Comment not found' });
     }
     console.log('Fetched comment:', comment._id);

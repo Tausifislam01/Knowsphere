@@ -18,25 +18,36 @@ function Home() {
   useEffect(() => {
     // Fetch current user
     const fetchCurrentUser = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found, skipping user fetch');
+        return;
+      }
       try {
+        console.log('Fetching user with token:', token.slice(0, 10) + '...');
         const response = await fetch('http://localhost:5000/api/auth/profile', {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${token}`,
           },
         });
         if (response.ok) {
           const user = await response.json();
+          console.log('Current user fetched:', user);
           setCurrentUser(user);
+        } else {
+          console.warn('Failed to fetch user, status:', response.status);
+          toast.warn('Unable to load user profile', { autoClose: 2000 });
         }
       } catch (error) {
         console.error('Fetch user error:', error);
-        toast.error('Failed to load user profile', { autoClose: 2000 });
+        toast.warn('Failed to load user profile', { autoClose: 2000 });
       }
     };
     fetchCurrentUser();
 
     // Handle user updates
     const handleUserUpdate = (event) => {
+      console.log('User update event:', event.detail);
       setCurrentUser(event.detail);
     };
     window.addEventListener('userUpdated', handleUserUpdate);
@@ -45,22 +56,35 @@ function Home() {
       const fetchSingleInsight = async () => {
         setIsLoading(true);
         try {
+          const token = localStorage.getItem('token');
+          console.log('Fetching single insight, token:', token ? 'Present' : 'Missing');
           const response = await fetch(`http://localhost:5000/api/insights/${id}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
           }
           const data = await response.json();
+          console.log('Fetched single insight:', data);
           setSingleInsight(data);
         } catch (error) {
           console.error('Fetch single insight error:', error);
-          setError(error.message.includes('Failed to fetch')
-            ? 'Unable to connect to the server. Please try again later.'
-            : `Error: ${error.message}`);
-          toast.error(`Error: ${error.message}`, { autoClose: 2000 });
+          setError(
+            error.message.includes('Insight not found')
+              ? 'Insight not found or hidden.'
+              : error.message.includes('Unauthorized')
+              ? 'You are not authorized to view this insight.'
+              : `Error: ${error.message}`
+          );
+          toast.error(
+            error.message.includes('Insight not found')
+              ? 'Insight not found or hidden.'
+              : error.message.includes('Unauthorized')
+              ? 'You are not authorized to view this insight.'
+              : `Error: ${error.message}`,
+            { autoClose: 2000 }
+          );
         } finally {
           setIsLoading(false);
         }
@@ -73,22 +97,30 @@ function Home() {
           const endpoint = showFollowed
             ? 'http://localhost:5000/api/insights/followed'
             : 'http://localhost:5000/api/insights/public';
-          const response = await fetch(endpoint, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
-          });
+          const token = localStorage.getItem('token');
+          console.log('Fetching insights from:', endpoint, 'Token:', token ? 'Present' : 'Missing');
+          const headers = showFollowed && token ? { Authorization: `Bearer ${token}` } : {};
+          const response = await fetch(endpoint, { headers });
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
           }
           const data = await response.json();
-          setInsights(data);
+          console.log('Fetched insights:', data);
+          setInsights(Array.isArray(data) ? data : []);
         } catch (error) {
           console.error('Fetch insights error:', error);
-          setError(error.message.includes('Failed to fetch')
-            ? 'Unable to connect to the server. Please try again later.'
-            : `Error: ${error.message}`);
-          toast.error(`Error: ${error.message}`, { autoClose: 2000 });
+          setError(
+            error.message.includes('Failed to fetch')
+              ? 'Unable to connect to the server. Please try again later.'
+              : `Error: ${error.message}`
+          );
+          toast.error(
+            error.message.includes('Failed to fetch')
+              ? 'Unable to connect to the server. Please try again later.'
+              : `Error: ${error.message}`,
+            { autoClose: 2000 }
+          );
         } finally {
           setIsLoading(false);
         }
@@ -109,16 +141,18 @@ function Home() {
     if (!window.confirm('Are you sure you want to delete this insight?')) return;
 
     try {
+      const token = localStorage.getItem('token');
+      console.log('Deleting insight:', insightId, 'Token:', token ? 'Present' : 'Missing');
       const response = await fetch(`http://localhost:5000/api/insights/${insightId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (response.ok) {
-        setInsights(insights.filter(insight => insight._id !== insightId));
+        setInsights(insights.filter((insight) => insight._id !== insightId));
         toast.success('Insight deleted successfully', { autoClose: 2000 });
-        window.alert('Your insight has been deleted successfully');
+        if (!id) {
+          window.alert('Your insight has been deleted successfully');
+        }
       } else {
         const data = await response.json();
         toast.error(data.message || 'Failed to delete insight', { autoClose: 2000 });
@@ -126,35 +160,50 @@ function Home() {
       }
     } catch (error) {
       console.error('Delete insight error:', error);
-      toast.error('Error deleting insight', { autoClose: 2000 });
-      window.alert('Error deleting insight: ' + error.message);
+      toast.error(`Error deleting insight: ${error.message}`, { autoClose: 2000 });
+      window.alert(`Error deleting insight: ${error.message}`);
     }
   };
 
-  const filteredInsights = insights.filter(insight => {
-    const matchesSearch = insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         insight.body.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredInsights = insights.filter((insight) => {
+    const matchesSearch =
+      (insight.title && insight.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (insight.body && insight.body.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesTag = selectedTag
-      ? insight.tags && Array.isArray(insight.tags) && insight.tags.map(t => t.trim().toLowerCase()).includes(selectedTag.toLowerCase())
+      ? insight.tags &&
+        Array.isArray(insight.tags) &&
+        insight.tags.map((t) => t.trim().toLowerCase()).includes(selectedTag.toLowerCase())
       : true;
+    console.log(`Insight ${insight._id || 'unknown'}: matchesSearch=${matchesSearch}, matchesTag=${matchesTag}`);
     return matchesSearch && matchesTag;
   });
 
-  const allTags = [...new Set(
-    insights.flatMap(insight =>
-      Array.isArray(insight.tags) ? insight.tags.map(t => t.trim()) : []
-    )
-  )];
+  const allTags = [
+    ...new Set(
+      insights.flatMap((insight) =>
+        Array.isArray(insight.tags) ? insight.tags.map((t) => t.trim()) : []
+      )
+    ),
+  ];
 
   if (id && isLoading) {
-    return <div className="container text-center mt-5">Loading...</div>;
+    return (
+      <div className="container mt-5 text-center">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <p>Loading insight...</p>
+      </div>
+    );
   }
 
   if (id && error) {
     return (
       <div className="container mt-5">
         <div className="alert alert-danger">{error}</div>
-        <Link to="/" className="glossy-button btn btn-sm">Back to Home</Link>
+        <Link to="/" className="glossy-button btn btn-sm">
+          Back to Home
+        </Link>
       </div>
     );
   }
@@ -162,8 +211,10 @@ function Home() {
   if (id && !singleInsight) {
     return (
       <div className="container mt-5">
-        <div className="alert alert-warning">Insight not found</div>
-        <Link to="/" className="glossy-button btn btn-sm">Back to Home</Link>
+        <div className="alert alert-warning">Insight not found or hidden.</div>
+        <Link to="/" className="glossy-button btn btn-sm">
+          Back to Home
+        </Link>
       </div>
     );
   }
@@ -215,8 +266,10 @@ function Home() {
                 onChange={(e) => setSelectedTag(e.target.value)}
               >
                 <option value="">All Tags</option>
-                {allTags.map(tag => (
-                  <option key={tag} value={tag}>#{tag}</option>
+                {allTags.map((tag) => (
+                  <option key={tag} value={tag}>
+                    #{tag}
+                  </option>
                 ))}
               </select>
             </div>
@@ -255,10 +308,14 @@ function Home() {
             <div className="text-center py-5">
               <i className="bi bi-lightbulb text-muted" style={{ fontSize: '3rem' }}></i>
               <h4 className="mt-3 text-muted">
-                {searchTerm || selectedTag ? 'No matching insights found' : 'No public insights yet'}
+                {searchTerm || selectedTag
+                  ? 'No matching insights found'
+                  : 'No public insights available'}
               </h4>
               <p className="text-muted mb-4">
-                {searchTerm || selectedTag ? 'Try a different search term or tag' : 'Be the first to share your knowledge!'}
+                {searchTerm || selectedTag
+                  ? 'Try a different search term or tag'
+                  : 'Be the first to share your knowledge!'}
               </p>
               <Link to="/insights/new" className="glossy-button btn btn-sm">
                 <i className="bi bi-plus-lg me-2"></i>
@@ -267,7 +324,7 @@ function Home() {
             </div>
           ) : (
             <div className="row g-4">
-              {filteredInsights.map(insight => (
+              {filteredInsights.map((insight) => (
                 <Insight
                   key={insight._id}
                   insight={insight}

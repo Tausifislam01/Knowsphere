@@ -18,6 +18,7 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
     upvotes: insight.upvotes.length,
     downvotes: insight.downvotes.length,
   });
+  const [showReportForm, setShowReportForm] = useState(false);
 
   useEffect(() => {
     socket.on('insightVoted', ({ insightId, voteType, userId }) => {
@@ -103,11 +104,27 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
     }
   };
 
+  // Function to close the dropdown menu
+  const closeDropdown = () => {
+    const dropdownMenu = document.querySelector(`#dropdownMenuButton-${insight._id} + .dropdown-menu`);
+    if (dropdownMenu) {
+      dropdownMenu.classList.remove('show');
+    }
+  };
+
   const tagsArray = Array.isArray(insight.tags) ? insight.tags : [];
 
   return (
     <div className={`card glossy-card mb-4 ${insight.isHidden ? 'bg-light opacity-50' : ''}`} id={`insight-${insight._id}`}>
       <div className="card-body position-relative">
+        {showReportForm && (
+          <ReportButton
+            itemId={insight._id}
+            itemType="Insight"
+            currentUser={currentUser}
+            onClose={() => setShowReportForm(false)}
+          />
+        )}
         <div className="dropdown position-absolute top-0 end-0 mt-2 me-2">
           <button
             className="btn btn-sm btn-link text-muted p-0"
@@ -126,7 +143,17 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
             </li>
             {currentUser && <BookmarkButton insightId={insight._id} />}
             {currentUser && currentUser._id !== insight.userId._id && (
-              <ReportButton itemId={insight._id} itemType="Insight" currentUser={currentUser} />
+              <li>
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    setShowReportForm(true);
+                    closeDropdown(); // Close dropdown without Bootstrap JS
+                  }}
+                >
+                  <i className="bi bi-flag me-2"></i>Report
+                </button>
+              </li>
             )}
             {currentUser && (currentUser._id === insight.userId._id || currentUser.isAdmin) && (
               <>

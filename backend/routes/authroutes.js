@@ -57,7 +57,7 @@ router.post('/signup', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
     await user.save();
-    const payload = { user: { id: user.id, isAdmin: user.isAdmin } }; // Include isAdmin in token
+    const payload = { user: { id: user.id, isAdmin: user.isAdmin } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.status(201).json({ token });
   } catch (error) {
@@ -78,7 +78,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    const payload = { user: { id: user.id, isAdmin: user.isAdmin } }; // Include isAdmin in token
+    const payload = { user: { id: user.id, isAdmin: user.isAdmin } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
   } catch (error) {
@@ -90,6 +90,10 @@ router.post('/login', async (req, res) => {
 // Get Profile
 router.get('/profile', auth, async (req, res) => {
   try {
+    if (!req.user.id) {
+      console.error('No user ID in req.user:', req.user);
+      return res.status(401).json({ message: 'Invalid token: No user ID' });
+    }
     const user = await User.findById(req.user.id)
       .select('-password')
       .populate('followers', 'username profilePicture')

@@ -2,18 +2,27 @@ import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { reportContent } from '../utils/api';
 
-const ReportButton = ({ itemId, itemType, currentUser }) => {
+const ReportButton = ({ itemId, itemType, currentUser, onClose }) => {
   const [isReporting, setIsReporting] = useState(false);
   const [reason, setReason] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true); // Form is always shown when component is rendered
+  const [error, setError] = useState('');
+
+  // Prevent rendering if user is the content owner
+  if (!currentUser || (itemType === 'Insight' && currentUser._id === itemId?.userId?._id)) {
+    return null;
+  }
 
   const handleReport = async (e) => {
     e.preventDefault();
     if (!currentUser) {
       toast.error('Please log in to report content', { autoClose: 2000 });
+      setShowForm(false);
+      onClose();
       return;
     }
     if (!reason.trim()) {
+      setError('Please provide a reason for reporting');
       toast.error('Please provide a reason for reporting', { autoClose: 2000 });
       return;
     }
@@ -24,83 +33,92 @@ const ReportButton = ({ itemId, itemType, currentUser }) => {
       toast.success('Report submitted successfully', { autoClose: 2000 });
       setShowForm(false);
       setReason('');
+      setError('');
+      onClose();
     } catch (error) {
       console.error('Report submission error:', error);
+      setError(`Error submitting report: ${error.message}`);
       toast.error(`Error submitting report: ${error.message}`, { autoClose: 2000 });
     } finally {
       setIsReporting(false);
     }
   };
 
-  if (!currentUser) return null;
+  if (!showForm) return null;
 
   return (
-    <>
-      <button
-        className="dropdown-item"
-        onClick={() => setShowForm(true)}
+    <div
+      className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+      onClick={() => {
+        setShowForm(false);
+        onClose();
+      }}
+    >
+      <div
+        className="card glossy-card p-4"
+        style={{ maxWidth: '500px', width: '90%' }}
+        onClick={e => e.stopPropagation()}
       >
-        <i className="bi bi-flag me-2"></i>Report
-      </button>
-      {showForm && (
-        <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="card glossy-card p-4"
-            style={{ maxWidth: '500px', width: '90%' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="card-header bg-warning text-white d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">Report {itemType}</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={() => setShowForm(false)}
-              />
-            </div>
-            <form onSubmit={handleReport}>
-              <div className="card-body">
-                <p>Please provide a reason for reporting this {itemType.toLowerCase()}.</p>
-                <textarea
-                  className="form-control"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Enter reason for report..."
-                  rows="4"
-                  required
-                />
-              </div>
-              <div className="card-footer d-flex justify-content-end">
-                <button
-                  type="button"
-                  className="glossy-button bg-secondary me-2"
-                  onClick={() => setShowForm(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="glossy-button bg-warning"
-                  disabled={isReporting}
-                >
-                  {isReporting ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Report'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+        <div className="card-header bg-warning text-white d-flex justify-content-between align-items-center">
+          <h5 className="mb-0">Report {itemType}</h5>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={() => {
+              setShowForm(false);
+              onClose();
+            }}
+            aria-label="Close"
+          />
         </div>
-      )}
-    </>
+        <form onSubmit={handleReport}>
+          <div className="card-body">
+            <p>Please provide a reason for reporting this {itemType.toLowerCase()}.</p>
+            <textarea
+              className={`form-control ${error ? 'is-invalid' : ''}`}
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                setError(''); // Clear error on input change
+              }}
+              placeholder="Enter reason for report..."
+              rows="4"
+              autoFocus
+              required
+              aria-describedby="reasonError"
+            />
+            {error && <div id="reasonError" className="invalid-feedback d-block">{error}</div>}
+          </div>
+          <div className="card-footer d-flex justify-content-end">
+            <button
+              type="button"
+              className="glossy-button bg-secondary me-2"
+              onClick={() => {
+                setShowForm(false);
+                onClose();
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="glossy-button bg-warning"
+              disabled={isReporting}
+            >
+              {isReporting ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit Report'
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 

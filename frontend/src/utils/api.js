@@ -7,6 +7,21 @@ const getAuthHeaders = () => ({
   },
 });
 
+// Helper function to handle API errors
+const handleApiError = async (response, defaultMessage) => {
+  if (!response.ok) {
+    let errorMessage = defaultMessage;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorMessage;
+    } catch (e) {
+      // Ignore JSON parse errors, use default message
+    }
+    throw new Error(errorMessage);
+  }
+  return response.json();
+};
+
 // Report content (insight or comment)
 export const reportContent = async (itemType, itemId, reason) => {
   const response = await fetch(`${API_URL}/reports`, {
@@ -17,23 +32,17 @@ export const reportContent = async (itemType, itemId, reason) => {
     },
     body: JSON.stringify({ reportedItemType: itemType, reportedItemId: itemId, reason }),
   });
-  if (!response.ok) {
-    throw new Error('Failed to submit report');
-  }
-  return response.json();
+  return handleApiError(response, 'Failed to submit report');
 };
 
-// Get all pending reports (admin only)
-export const getReports = async () => {
+// Fetch all pending reports (admin only)
+export const fetchReports = async () => {
   const response = await fetch(`${API_URL}/admin/reports`, getAuthHeaders());
-  if (!response.ok) {
-    throw new Error('Failed to fetch reports');
-  }
-  return response.json();
+  return handleApiError(response, 'Failed to fetch reports');
 };
 
 // Resolve or dismiss a report (admin only)
-export const resolveReport = async (reportId, status) => {
+export const resolveReport = async (reportId, status = 'resolved') => {
   const response = await fetch(`${API_URL}/admin/reports/${reportId}/resolve`, {
     method: 'POST',
     headers: {
@@ -42,46 +51,61 @@ export const resolveReport = async (reportId, status) => {
     },
     body: JSON.stringify({ status }),
   });
-  if (!response.ok) {
-    throw new Error('Failed to resolve report');
-  }
-  return response.json();
+  return handleApiError(response, 'Failed to resolve report');
+};
+
+// Fetch all users (admin only)
+export const fetchUsers = async () => {
+  const response = await fetch(`${API_URL}/admin/users`, getAuthHeaders());
+  return handleApiError(response, 'Failed to fetch users');
+};
+
+// Fetch reported insights (admin only)
+export const fetchReportedInsights = async () => {
+  const response = await fetch(`${API_URL}/admin/insights/reported`, getAuthHeaders());
+  return handleApiError(response, 'Failed to fetch reported insights');
+};
+
+// Fetch reported comments (admin only)
+export const fetchReportedComments = async () => {
+  const response = await fetch(`${API_URL}/admin/comments/reported`, getAuthHeaders());
+  return handleApiError(response, 'Failed to fetch reported comments');
 };
 
 // Delete an insight (admin only)
 export const deleteInsight = async (insightId) => {
-  const response = await fetch(`${API_URL}/insights/${insightId}`, {
+  const response = await fetch(`${API_URL}/admin/insights/${insightId}`, {
     method: 'DELETE',
     ...getAuthHeaders(),
   });
-  if (!response.ok) {
-    throw new Error('Failed to delete insight');
-  }
-  return response.json();
+  return handleApiError(response, 'Failed to delete insight');
+};
+
+// Delete a comment (admin only)
+export const deleteComment = async (commentId) => {
+  const response = await fetch(`${API_URL}/admin/comments/${commentId}`, {
+    method: 'DELETE',
+    ...getAuthHeaders(),
+  });
+  return handleApiError(response, 'Failed to delete comment');
 };
 
 // Hide an insight (admin only)
 export const hideInsight = async (insightId) => {
-  const response = await fetch(`${API_URL}/insights/${insightId}/hide`, {
+  const response = await fetch(`${API_URL}/admin/insights/${insightId}/hide`, {
     method: 'PUT',
     ...getAuthHeaders(),
   });
-  if (!response.ok) {
-    throw new Error('Failed to hide insight');
-  }
-  return response.json();
+  return handleApiError(response, 'Failed to hide insight');
 };
 
 // Hide a comment (admin only)
 export const hideComment = async (commentId) => {
-  const response = await fetch(`${API_URL}/insights/comments/${commentId}/hide`, {
+  const response = await fetch(`${API_URL}/admin/comments/${commentId}/hide`, {
     method: 'PUT',
     ...getAuthHeaders(),
   });
-  if (!response.ok) {
-    throw new Error('Failed to hide comment');
-  }
-  return response.json();
+  return handleApiError(response, 'Failed to hide comment');
 };
 
 // Ban a user (admin only)
@@ -90,10 +114,7 @@ export const banUser = async (userId) => {
     method: 'POST',
     ...getAuthHeaders(),
   });
-  if (!response.ok) {
-    throw new Error('Failed to ban user');
-  }
-  return response.json();
+  return handleApiError(response, 'Failed to ban user');
 };
 
 // Unban a user (admin only)
@@ -102,8 +123,5 @@ export const unbanUser = async (userId) => {
     method: 'POST',
     ...getAuthHeaders(),
   });
-  if (!response.ok) {
-    throw new Error('Failed to unban user');
-  }
-  return response.json();
+  return handleApiError(response, 'Failed to unban user');
 };

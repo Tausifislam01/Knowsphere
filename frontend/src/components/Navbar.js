@@ -35,6 +35,9 @@ function Navbar({ currentUser }) {
               <>
                 <Link className="nav-link" to={`/profile/${currentUser._id}`}>Profile</Link>
                 <Link className="nav-link" to="/bookmarks">Bookmarks</Link>
+                {currentUser.isAdmin && (
+                  <Link className="nav-link" to="/admin">Admin Dashboard</Link>
+                )}
                 <Link className="nav-link" to="/settings">Settings</Link>
                 <button
                   className="nav-link btn btn-link"

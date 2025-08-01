@@ -20,8 +20,8 @@ const auth = async (req, res, next) => {
       console.log('User is banned:', user.username);
       return res.status(403).json({ message: 'User is banned' });
     }
-    req.user = user; // Attach full user object
-    console.log('Auth middleware - User:', { id: user._id, username: user.username, isAdmin: user.isAdmin }); // Debug
+    req.user = { id: user._id.toString(), ...user.toObject() }; // Explicitly set id
+    console.log('Auth middleware - User:', { id: req.user.id, username: user.username, isAdmin: user.isAdmin });
     next();
   } catch (error) {
     console.error('Token verification error:', error.message);
@@ -30,7 +30,7 @@ const auth = async (req, res, next) => {
 };
 
 const adminAuth = (req, res, next) => {
-  console.log('AdminAuth middleware - Checking user:', { id: req.user._id, isAdmin: req.user.isAdmin }); // Debug
+  console.log('AdminAuth middleware - Checking user:', { id: req.user.id, isAdmin: req.user.isAdmin });
   if (!req.user.isAdmin) {
     console.log('Admin access denied for user:', req.user.username);
     return res.status(403).json({ message: 'Admin access required' });
