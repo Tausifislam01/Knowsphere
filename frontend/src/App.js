@@ -19,27 +19,59 @@ import './style.css';
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
 
-useEffect(() => {
   const fetchCurrentUser = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setCurrentUser(null);
+      return;
+    }
     try {
       const response = await fetch('http://localhost:5000/api/auth/profile', {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${token}`,
         },
       });
-      const user = await response.json();
-      console.log('Fetched user:', user); // Debug
-      setCurrentUser(user);
-      toast.success('User profile loaded successfully', { autoClose: 2000 });
+      if (response.ok) {
+        const user = await response.json();
+        setCurrentUser(user);
+        localStorage.setItem('userId', user._id);
+        // Removed toast.success to avoid unnecessary notifications on mount
+      } else {
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
+        setCurrentUser(null);
+        toast.error('Failed to load user profile', { autoClose: 2000 });
+      }
     } catch (error) {
       console.error('Fetch user error:', error);
+      localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      setCurrentUser(null);
       toast.error('Error connecting to server', { autoClose: 2000 });
     }
   };
-  if (localStorage.getItem('token')) {
+
+  // Run on mount
+  useEffect(() => {
     fetchCurrentUser();
-  }
-}, []);
+  }, []);
+
+  // Handle user update events
+  useEffect(() => {
+    const handleUserUpdate = (event) => {
+      setCurrentUser(event.detail);
+    };
+    window.addEventListener('userUpdated', handleUserUpdate);
+    return () => {
+      window.removeEventListener('userUpdated', handleUserUpdate);
+    };
+  }, []);
+
+  // Callback for Login.js to update currentUser
+  const handleLogin = async (token) => {
+    localStorage.setItem('token', token);
+    await fetchCurrentUser();
+  };
 
   return (
     <Router>
@@ -50,10 +82,12 @@ useEffect(() => {
           <Route path="/insights/:id" element={<Home currentUser={currentUser} />} />
           <Route path="/tags/:tag" element={<TagInsights currentUser={currentUser} />} />
           <Route path="/insights/new" element={<InsightForm />} />
+          <Route path="/insights/edit/:insightId" element={<InsightForm />} />
           <Route path="/profile/:userId" element={<Profile currentUser={currentUser} />} />
+          <Route path="/profile" element={<Profile currentUser={currentUser} />} />
           <Route path="/bookmarks" element={<Bookmarks currentUser={currentUser} />} />
           <Route path="/settings" element={<Settings currentUser={currentUser} />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/edit-profile" element={<EditProfile currentUser={currentUser} />} />
           <Route path="/admin" element={<AdminDashboard currentUser={currentUser} />} />

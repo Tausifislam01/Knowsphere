@@ -27,16 +27,21 @@ function CommentSection({ insightId, currentUser }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Debug replyingTo state
+  useEffect(() => {
+    console.log('Replying to comment:', replyingTo);
+  }, [replyingTo]);
+
   useEffect(() => {
     const fetchComments = async () => {
       setIsLoading(true);
       try {
-        console.log('Fetching comments from:', `${BACKEND_URL}/api/insights/${insightId}/comments`);
+        console.log('Fetching comments for insight:', insightId);
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const response = await fetch(`${BACKEND_URL}/api/insights/${insightId}/comments`, { headers });
         if (!response.ok) {
           const text = await response.text();
-          console.log('Fetch comments response:', { status: response.status, body: text });
+          console.error('Fetch comments failed:', { status: response.status, body: text });
           if (response.status === 401) {
             setShowAuthModal(true);
             setError('Please log in to view all comments');
@@ -44,15 +49,29 @@ function CommentSection({ insightId, currentUser }) {
             setComments([]);
             return;
           }
+          if (response.status === 404) {
+            setError('Insight not found');
+            toast.error('Insight not found', { autoClose: 2000 });
+            setComments([]);
+            return;
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         console.log('Fetched comments:', data);
-        setComments(Array.isArray(data) ? data : []);
+        if (!Array.isArray(data)) {
+          console.error('Comments response is not an array:', data);
+          setError('Invalid comments data received');
+          setComments([]);
+          return;
+        }
+        setComments(data);
+        setError('');
       } catch (error) {
         console.error('Fetch comments error:', error);
-        setError(`Error: ${error.message}`);
+        setError(`Error fetching comments: ${error.message}`);
         toast.error(`Error fetching comments: ${error.message}`, { autoClose: 2000 });
+        setComments([]);
       } finally {
         setIsLoading(false);
       }
@@ -65,23 +84,28 @@ function CommentSection({ insightId, currentUser }) {
       fetchComments();
     } else if ((showComments || commentId) && !token) {
       setShowAuthModal(true);
+      setError('Please log in to view comments');
     }
 
     if (commentId && showComments) {
       setTimeout(() => {
         const commentElement = document.getElementById(`comment-${commentId}`);
         if (commentElement) {
+          console.log('Scrolling to comment:', commentId);
           commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           commentElement.style.backgroundColor = '#fff3cd';
           setTimeout(() => {
             commentElement.style.backgroundColor = '';
           }, 2000);
+        } else {
+          console.warn('Comment element not found:', commentId);
         }
       }, 500);
     }
 
     socket.on('newComment', (comment) => {
       if (comment.insightId === insightId) {
+        console.log('New comment received via socket:', comment);
         setComments((prevComments) => {
           if (!prevComments.some(c => c._id === comment._id)) {
             return [...prevComments, comment];
@@ -94,6 +118,7 @@ function CommentSection({ insightId, currentUser }) {
 
     socket.on('commentUpdated', (updatedComment) => {
       if (updatedComment.insightId === insightId) {
+        console.log('Comment updated via socket:', updatedComment);
         setComments((prevComments) =>
           prevComments.map(c => c._id === updatedComment._id ? updatedComment : c)
         );
@@ -122,6 +147,7 @@ function CommentSection({ insightId, currentUser }) {
 
     setIsLoading(true);
     try {
+      console.log('Posting comment/reply:', { text, parentCommentId });
       const response = await fetch(`${BACKEND_URL}/api/insights/${insightId}/comments`, {
         method: 'POST',
         headers: {
@@ -132,19 +158,24 @@ function CommentSection({ insightId, currentUser }) {
       });
       if (!response.ok) {
         const data = await response.json();
-        console.log('Add comment response:', { status: response.status, data });
+        console.error('Add comment failed:', { status: response.status, data });
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
       const addedComment = await response.json();
+      console.log('Added comment:', addedComment);
       setComments((prevComments) => [...prevComments, addedComment]);
-      parentCommentId ? setReplyText('') : setNewComment('');
-      setReplyingTo(null);
+      if (parentCommentId) {
+        setReplyText('');
+        setReplyingTo(null);
+      } else {
+        setNewComment('');
+      }
       setError('');
       setDisplayedComments((prev) => Math.max(prev, comments.length + 1));
       toast.success(parentCommentId ? 'Reply posted successfully' : 'Comment posted successfully', { autoClose: 2000 });
     } catch (error) {
       console.error('Add comment error:', error);
-      setError(`Error: ${error.message}`);
+      setError(`Error posting ${parentCommentId ? 'reply' : 'comment'}: ${error.message}`);
       toast.error(`Error posting ${parentCommentId ? 'reply' : 'comment'}: ${error.message}`, { autoClose: 2000 });
     } finally {
       setIsLoading(false);
@@ -176,10 +207,11 @@ function CommentSection({ insightId, currentUser }) {
       });
       if (!response.ok) {
         const data = await response.json();
-        console.log('Edit comment response:', { status: response.status, data });
+        console.error('Edit comment failed:', { status: response.status, data });
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
       const updatedComment = await response.json();
+      console.log('Updated comment:', updatedComment);
       setComments(comments.map(comment =>
         comment._id === commentId ? updatedComment : comment
       ));
@@ -189,7 +221,7 @@ function CommentSection({ insightId, currentUser }) {
       toast.success('Comment edited successfully', { autoClose: 2000 });
     } catch (error) {
       console.error('Edit comment error:', error);
-      setError(`Error: ${error.message}`);
+      setError(`Error editing comment: ${error.message}`);
       toast.error(`Error editing comment: ${error.message}`, { autoClose: 2000 });
     } finally {
       setIsLoading(false);
@@ -212,14 +244,15 @@ function CommentSection({ insightId, currentUser }) {
       });
       if (!response.ok) {
         const data = await response.json();
-        console.log('Delete comment response:', { status: response.status, data });
+        console.error('Delete comment failed:', { status: response.status, data });
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
+      console.log('Deleted comment:', commentId);
       setComments(comments.filter(comment => comment._id !== commentId));
       toast.success('Comment deleted successfully', { autoClose: 2000 });
     } catch (error) {
       console.error('Delete comment error:', error);
-      setError(`Error: ${error.message}`);
+      setError(`Error deleting comment: ${error.message}`);
       toast.error(`Error deleting comment: ${error.message}`, { autoClose: 2000 });
     } finally {
       setIsLoading(false);
@@ -239,17 +272,21 @@ function CommentSection({ insightId, currentUser }) {
       });
       const data = await response.json();
       if (response.ok) {
+        console.log('Comment hide/unhide:', data);
         setComments(comments.map(c => c._id === commentId ? data : c));
         toast.success(`Comment ${data.isHidden ? 'hidden' : 'unhidden'} successfully`, { autoClose: 2000 });
       } else {
+        console.error('Hide comment failed:', data);
         toast.error(data.message || 'Failed to update comment', { autoClose: 2000 });
       }
     } catch (error) {
+      console.error('Hide comment error:', error);
       toast.error('Error updating comment: ' + error.message, { autoClose: 2000 });
     }
   };
 
   const handleReplyClick = (commentId) => {
+    console.log('Reply button clicked for comment:', commentId);
     if (!token) {
       setShowAuthModal(true);
       toast.error('Please log in to reply to a comment', { autoClose: 2000 });
@@ -262,6 +299,7 @@ function CommentSection({ insightId, currentUser }) {
   };
 
   const handleEditClick = (commentId, currentText) => {
+    console.log('Edit button clicked for comment:', commentId);
     if (!token) {
       setShowAuthModal(true);
       toast.error('Please log in to edit a comment', { autoClose: 2000 });
@@ -288,9 +326,11 @@ function CommentSection({ insightId, currentUser }) {
     setEditingCommentId(null);
     setError('');
     setShowReplies({});
+    setShowReportForm(null);
   };
 
   const toggleReplies = (commentId) => {
+    console.log('Toggling replies for comment:', commentId, 'Current showReplies:', showReplies);
     if (!token) {
       setShowAuthModal(true);
       toast.error('Please log in to view replies', { autoClose: 2000 });
@@ -307,8 +347,6 @@ function CommentSection({ insightId, currentUser }) {
       insightElement.scrollIntoView({ behavior: 'smooth' });
     } else {
       console.warn(`Insight element with ID 'insight-${insightId}' not found.`);
-      console.log('Available insight IDs in DOM:',
-        Array.from(document.querySelectorAll('[id^="insight-"]')).map(el => el.id));
       setError('Unable to scroll to insight: Post not found.');
       toast.error('Unable to scroll to insight: Post not found.', { autoClose: 2000 });
     }
@@ -329,15 +367,13 @@ function CommentSection({ insightId, currentUser }) {
     console.log(`Building comment tree for parentId: ${parentId || 'null'}, depth: ${depth}, comments:`, filteredComments);
     const displayCount = isTopLevel ? displayedComments : filteredComments.length;
     return filteredComments.slice(0, displayCount).map(comment => {
+      if (!comment._id || !comment.text || !comment.userId) {
+        console.warn('Invalid comment data skipped:', comment);
+        return null;
+      }
       const hasReplies = comments.some(c => c.parentCommentId === comment._id);
       const replyCount = comments.filter(c => c.parentCommentId === comment._id).length;
       const isHidden = comment.isHidden && !currentUser?.isAdmin;
-
-      // Ensure comment has required fields
-      if (!comment._id || !comment.text) {
-        console.warn('Invalid comment data:', comment);
-        return null;
-      }
 
       return (
         <div
@@ -471,50 +507,49 @@ function CommentSection({ insightId, currentUser }) {
                           <i className="bi bi-heart me-1"></i>Like
                         </button>
                       </div>
+                      {replyingTo === comment._id && (
+                        console.log('Rendering reply form for comment:', comment._id),
+                        <form onSubmit={(e) => handleAddComment(e, comment._id)} className="mt-2">
+                          <textarea
+                            className="form-control mb-2"
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="Write a reply..."
+                            rows="3"
+                          />
+                          <div className="d-flex">
+                            <button type="submit" className="glossy-button btn-sm me-2" disabled={isLoading || !replyText.trim()}>
+                              Post Reply
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary btn-sm"
+                              onClick={() => setReplyingTo(null)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      )}
                     </>
                   )}
+                  {hasReplies && (
+                    <button
+                      className="btn btn-link text-muted p-0 mt-1"
+                      onClick={() => toggleReplies(comment._id)}
+                    >
+                      {showReplies[comment._id] ? `Hide Replies (${replyCount})` : `See Replies (${replyCount})`}
+                    </button>
+                  )}
+                  {showReplies[comment._id] && buildCommentTree(comments, comment._id, depth + 1)}
                 </>
               )}
-              {hasReplies && (
-                <button
-                  className="btn btn-link text-muted p-0 mt-1"
-                  onClick={() => toggleReplies(comment._id)}
-                >
-                  {showReplies[comment._id] ? `Hide Replies (${replyCount})` : `See Replies (${replyCount})`}
-                </button>
-              )}
-              {replyingTo === comment._id && (
-                <form onSubmit={(e) => handleAddComment(e, comment._id)} className="mt-3">
-                  <textarea
-                    className="form-control mb-2"
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder="Write your reply..."
-                    rows="3"
-                  />
-                  <div className="d-flex">
-                    <button type="submit" className="glossy-button btn-sm me-2" disabled={isLoading}>
-                      Post Reply
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => setReplyingTo(null)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
-              {showReplies[comment._id] && buildCommentTree(comments, comment._id, depth + 1)}
             </div>
           </div>
         </div>
       );
-    }).filter(Boolean); // Remove null entries from invalid comments
+    }).filter(Boolean);
   };
-
-  console.log('Rendering comments-list with comments:', comments);
 
   return (
     <div className="mt-3 comment-section">

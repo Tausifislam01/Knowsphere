@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-function Login() {
+function Login({ onLogin }) {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -42,7 +42,7 @@ function Login() {
       });
       const data = await response.json();
       if (response.ok) {
-        localStorage.setItem('token', data.token);
+        onLogin(data.token); // Call onLogin callback with token
         navigate('/');
       } else {
         setError(data.message || 'Failed to log in');
@@ -60,15 +60,12 @@ function Login() {
         <div className="row justify-content-center">
           <div className="col-md-8 col-lg-6">
             <div className="card border-0 shadow-lg rounded-4 overflow-hidden">
-              {/* Card Header with Branding */}
               <div className="card-header glossy-navbar p-4 text-center">
                 <h2 className="mb-0 text-black">
                   <i className="bi bi-shield-lock me-2"></i>
                   Welcome Back
                 </h2>
               </div>
-              
-              {/* Card Body */}
               <div className="card-body p-4 p-md-5">
                 {error && (
                   <div className="alert alert-danger d-flex align-items-center" role="alert">
@@ -76,7 +73,6 @@ function Login() {
                     <div>{error}</div>
                   </div>
                 )}
-
                 <form onSubmit={handleSubmit} className="needs-validation" noValidate>
                   <div className="mb-4">
                     <label htmlFor="username" className="form-label fw-semibold">
@@ -98,7 +94,6 @@ function Login() {
                       />
                     </div>
                   </div>
-
                   <div className="mb-4">
                     <label htmlFor="password" className="form-label fw-semibold">
                       Password <span className="text-danger">*</span>
@@ -119,7 +114,6 @@ function Login() {
                       />
                     </div>
                   </div>
-
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <div className="form-check">
                       <input
@@ -135,7 +129,6 @@ function Login() {
                       Forgot password?
                     </Link>
                   </div>
-
                   <button
                     type="submit"
                     className="glossy-button w-100 py-3 fw-bold"
@@ -154,7 +147,6 @@ function Login() {
                     )}
                   </button>
                 </form>
-
                 <div className="text-center mt-4">
                   <p className="mb-0">
                     Don't have an account?{' '}

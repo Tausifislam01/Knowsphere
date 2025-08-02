@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Insight from '../components/Insight';
 
-function Home() {
+function Home({ currentUser }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [insights, setInsights] = useState([]);
@@ -13,51 +13,13 @@ function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [showFollowed, setShowFollowed] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    // Fetch current user
-    const fetchCurrentUser = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.warn('No token found, skipping user fetch');
-        return;
-      }
-      try {
-        console.log('Fetching user with token:', token.slice(0, 10) + '...');
-        const response = await fetch('http://localhost:5000/api/auth/profile', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (response.ok) {
-          const user = await response.json();
-          console.log('Current user fetched:', user);
-          setCurrentUser(user);
-        } else {
-          console.warn('Failed to fetch user, status:', response.status);
-          toast.warn('Unable to load user profile', { autoClose: 2000 });
-        }
-      } catch (error) {
-        console.error('Fetch user error:', error);
-        toast.warn('Failed to load user profile', { autoClose: 2000 });
-      }
-    };
-    fetchCurrentUser();
-
-    // Handle user updates
-    const handleUserUpdate = (event) => {
-      console.log('User update event:', event.detail);
-      setCurrentUser(event.detail);
-    };
-    window.addEventListener('userUpdated', handleUserUpdate);
-
     if (id) {
       const fetchSingleInsight = async () => {
         setIsLoading(true);
         try {
           const token = localStorage.getItem('token');
-          console.log('Fetching single insight, token:', token ? 'Present' : 'Missing');
           const response = await fetch(`http://localhost:5000/api/insights/${id}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
@@ -66,10 +28,8 @@ function Home() {
             throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
           }
           const data = await response.json();
-          console.log('Fetched single insight:', data);
           setSingleInsight(data);
         } catch (error) {
-          console.error('Fetch single insight error:', error);
           setError(
             error.message.includes('Insight not found')
               ? 'Insight not found or hidden.'
@@ -98,7 +58,6 @@ function Home() {
             ? 'http://localhost:5000/api/insights/followed'
             : 'http://localhost:5000/api/insights/public';
           const token = localStorage.getItem('token');
-          console.log('Fetching insights from:', endpoint, 'Token:', token ? 'Present' : 'Missing');
           const headers = showFollowed && token ? { Authorization: `Bearer ${token}` } : {};
           const response = await fetch(endpoint, { headers });
           if (!response.ok) {
@@ -106,10 +65,8 @@ function Home() {
             throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
           }
           const data = await response.json();
-          console.log('Fetched insights:', data);
           setInsights(Array.isArray(data) ? data : []);
         } catch (error) {
-          console.error('Fetch insights error:', error);
           setError(
             error.message.includes('Failed to fetch')
               ? 'Unable to connect to the server. Please try again later.'
@@ -127,10 +84,6 @@ function Home() {
       };
       fetchInsights();
     }
-
-    return () => {
-      window.removeEventListener('userUpdated', handleUserUpdate);
-    };
   }, [id, showFollowed]);
 
   const handleEdit = (insightId) => {
@@ -139,10 +92,8 @@ function Home() {
 
   const handleDelete = async (insightId) => {
     if (!window.confirm('Are you sure you want to delete this insight?')) return;
-
     try {
       const token = localStorage.getItem('token');
-      console.log('Deleting insight:', insightId, 'Token:', token ? 'Present' : 'Missing');
       const response = await fetch(`http://localhost:5000/api/insights/${insightId}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -159,7 +110,6 @@ function Home() {
         window.alert(data.message || 'Failed to delete insight');
       }
     } catch (error) {
-      console.error('Delete insight error:', error);
       toast.error(`Error deleting insight: ${error.message}`, { autoClose: 2000 });
       window.alert(`Error deleting insight: ${error.message}`);
     }
@@ -174,7 +124,6 @@ function Home() {
         Array.isArray(insight.tags) &&
         insight.tags.map((t) => t.trim().toLowerCase()).includes(selectedTag.toLowerCase())
       : true;
-    console.log(`Insight ${insight._id || 'unknown'}: matchesSearch=${matchesSearch}, matchesTag=${matchesTag}`);
     return matchesSearch && matchesTag;
   });
 

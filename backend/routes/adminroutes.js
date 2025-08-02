@@ -22,6 +22,56 @@ router.get('/reports', auth, adminAuth, async (req, res) => {
   }
 });
 
+// GET /api/admin/insights/reported - Fetch reported insights
+router.get('/insights/reported', auth, adminAuth, async (req, res) => {
+  try {
+    // Find reports for insights
+    const insightReports = await Report.find({ reportedItemType: 'Insight' })
+      .populate({
+        path: 'reportedItemId',
+        populate: { path: 'userId', select: 'username' },
+      });
+
+    // Extract unique insights from reports
+    const reportedInsights = insightReports
+      .filter(report => report.reportedItemId) // Ensure reportedItemId exists
+      .map(report => report.reportedItemId)
+      .filter((insight, index, self) => 
+        self.findIndex(i => i._id.toString() === insight._id.toString()) === index
+      ); // Remove duplicates
+
+    res.json(reportedInsights);
+  } catch (error) {
+    console.error('Get reported insights error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/admin/comments/reported - Fetch reported comments
+router.get('/comments/reported', auth, adminAuth, async (req, res) => {
+  try {
+    // Find reports for comments
+    const commentReports = await Report.find({ reportedItemType: 'Comment' })
+      .populate({
+        path: 'reportedItemId',
+        populate: { path: 'userId', select: 'username' },
+      });
+
+    // Extract unique comments from reports
+    const reportedComments = commentReports
+      .filter(report => report.reportedItemId) // Ensure reportedItemId exists
+      .map(report => report.reportedItemId)
+      .filter((comment, index, self) => 
+        self.findIndex(c => c._id.toString() === comment._id.toString()) === index
+      ); // Remove duplicates
+
+    res.json(reportedComments);
+  } catch (error) {
+    console.error('Get reported comments error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/admin/users - Fetch all users
 router.get('/users', auth, adminAuth, async (req, res) => {
   try {

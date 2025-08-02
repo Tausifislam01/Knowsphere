@@ -55,6 +55,7 @@ router.get('/:insightId/comments', async (req, res) => {
     const { insightId } = req.params;
     const insight = await Insight.findById(insightId);
     if (!insight) {
+      console.log('Insight not found:', insightId);
       return res.status(404).json({ message: 'Insight not found' });
     }
     // Allow admins or insight owners to see hidden comments
@@ -66,17 +67,27 @@ router.get('/:insightId/comments', async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         user = await User.findById(decoded.user.id);
       } catch (error) {
-        console.warn('Invalid token provided:', error.message);
+        console.warn('Invalid token provided for comments fetch:', error.message);
       }
     }
     const query = { insightId, isHidden: false };
     if (user && (user.isAdmin || insight.userId.toString() === user._id.toString())) {
+      console.log('User is admin or insight owner, fetching all comments including hidden:', user?._id);
       delete query.isHidden; // Admins/owners see all comments
+    } else {
+      console.log('Fetching non-hidden comments for insight:', insightId);
     }
     const comments = await Comment.find(query)
       .populate('userId', 'username profilePicture')
       .sort({ createdAt: -1 });
-    console.log(`Fetched ${comments.length} comments for insight ${insightId}`);
+    console.log(`Fetched ${comments.length} comments for insight ${insightId}:`, comments.map(c => ({
+      _id: c._id,
+      text: c.text,
+      userId: c.userId?._id,
+      username: c.userId?.username,
+      isHidden: c.isHidden,
+      parentCommentId: c.parentCommentId,
+    })));
     res.json(comments);
   } catch (error) {
     console.error('Fetch comments error:', error);

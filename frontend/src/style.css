@@ -368,3 +368,21 @@ button.btn-primary:hover {
 .scroll-top-button {
   transition: opacity 0.3s ease;
 }
+
+/* Admin Dashboard Navigation Tabs */
+.nav-tabs .nav-link {
+  color: #000000 !important; /* Black text for all states */
+  background-color: transparent; /* Ensure no background interference */
+  transition: color 0.3s ease, background-color 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+  color: #333333 !important; /* Slightly darker gray for hover */
+  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover background */
+}
+
+.nav-tabs .nav-link.active {
+  color: #000000 !important; /* Black text for active tab */
+  background-color: #ffffff !important; /* White background for active tab */
+  border-color: #dee2e6 #dee2e6 #ffffff !important; /* Match Bootstrap's default tab border */
+}

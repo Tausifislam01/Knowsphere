@@ -9,9 +9,6 @@ function Profile() {
   const [currentUser, setCurrentUser] = useState(null);
   const [insights, setInsights] = useState([]);
   const [error, setError] = useState('');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
-  const [deleteError, setDeleteError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -83,30 +80,6 @@ function Profile() {
       window.removeEventListener('userUpdated', handleUserUpdate);
     };
   }, [navigate, userId]);
-
-  const handleDeleteProfile = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch('http://localhost:5000/api/auth/delete', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ password: deletePassword }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('userId');
-        navigate('/login', { replace: true });
-      } else {
-        setDeleteError(data.message || 'Failed to delete profile');
-      }
-    } catch (error) {
-      setDeleteError('Error: ' + error.message);
-    }
-  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -206,24 +179,6 @@ function Profile() {
                   </div>
                 )}
               </div>
-              {(!userId || userId === currentUser?._id) && (
-                <>
-                  <button
-                    className="glossy-button mt-auto w-75"
-                    onClick={() => navigate('/edit-profile')}
-                  >
-                    <i className="bi bi-pencil-square me-2"></i>
-                    Edit Profile
-                  </button>
-                  <button
-                    className="glossy-button mt-2 w-75 bg-danger hover:bg-danger-dark"
-                    onClick={() => setShowDeleteModal(true)}
-                  >
-                    <i className="bi bi-trash me-2"></i>
-                    Delete Profile
-                  </button>
-                </>
-              )}
             </div>
           </div>
         </div>
@@ -388,60 +343,6 @@ function Profile() {
             ></button>
           </div>
           <div className="toast-body">{error}</div>
-        </div>
-      )}
-      {showDeleteModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header bg-danger text-white">
-                <h5 className="modal-title">Delete Profile</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setDeletePassword('');
-                    setDeleteError('');
-                  }}
-                ></button>
-              </div>
-              <form onSubmit={handleDeleteProfile}>
-                <div className="modal-body">
-                  <p className="text-danger">
-                    Warning: This action is irreversible. All your data, including insights, will be deleted.
-                  </p>
-                  <div className="mb-3">
-                    <label className="form-label">Enter your password to confirm</label>
-                    <input
-                      type="password"
-                      className="form-control"
-                      value={deletePassword}
-                      onChange={(e) => setDeletePassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  {deleteError && <p className="text-danger">{deleteError}</p>}
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="glossy-button bg-secondary hover:bg-secondary-dark"
-                    onClick={() => {
-                      setShowDeleteModal(false);
-                      setDeletePassword('');
-                      setDeleteError('');
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="glossy-button bg-danger hover:bg-danger-dark">
-                    <i className="bi bi-trash me-2"></i> Delete Profile
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
         </div>
       )}
     </div>
