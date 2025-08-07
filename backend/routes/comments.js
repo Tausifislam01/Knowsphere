@@ -5,7 +5,6 @@ const Insight = require('../models/Insight');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 
-// POST /api/insights/:insightId/comments - Create a comment or reply
 router.post('/:insightId/comments', auth, async (req, res) => {
   try {
     const { insightId } = req.params;
@@ -44,21 +43,17 @@ router.post('/:insightId/comments', auth, async (req, res) => {
     await Insight.findByIdAndUpdate(insightId, { $inc: { commentCount: 1 } });
     res.status(201).json(populatedComment);
   } catch (error) {
-    console.error('Create comment error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// GET /api/insights/:insightId/comments - Fetch comments for an insight
 router.get('/:insightId/comments', async (req, res) => {
   try {
     const { insightId } = req.params;
     const insight = await Insight.findById(insightId);
     if (!insight) {
-      console.log('Insight not found:', insightId);
       return res.status(404).json({ message: 'Insight not found' });
     }
-    // Allow admins or insight owners to see hidden comments
     const token = req.header('Authorization')?.replace('Bearer ', '');
     let user = null;
     if (token) {
@@ -67,75 +62,53 @@ router.get('/:insightId/comments', async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         user = await User.findById(decoded.user.id);
       } catch (error) {
-        console.warn('Invalid token provided for comments fetch:', error.message);
       }
     }
     const query = { insightId, isHidden: false };
     if (user && (user.isAdmin || insight.userId.toString() === user._id.toString())) {
-      console.log('User is admin or insight owner, fetching all comments including hidden:', user?._id);
-      delete query.isHidden; // Admins/owners see all comments
-    } else {
-      console.log('Fetching non-hidden comments for insight:', insightId);
+      delete query.isHidden;
     }
     const comments = await Comment.find(query)
       .populate('userId', 'username profilePicture')
       .sort({ createdAt: -1 });
-    console.log(`Fetched ${comments.length} comments for insight ${insightId}:`, comments.map(c => ({
-      _id: c._id,
-      text: c.text,
-      userId: c.userId?._id,
-      username: c.userId?.username,
-      isHidden: c.isHidden,
-      parentCommentId: c.parentCommentId,
-    })));
     res.json(comments);
   } catch (error) {
-    console.error('Fetch comments error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// GET /api/insights/comments/:id - Fetch a single comment by ID
 router.get('/comments/:id', auth, async (req, res) => {
   try {
     const comment = await Comment.findById(req.params.id)
       .populate('userId', 'username profilePicture')
       .populate('insightId', 'title');
     if (!comment) {
-      console.log('Comment not found:', req.params.id);
       return res.status(404).json({ message: 'Comment not found' });
     }
     if (comment.isHidden && comment.insightId.userId.toString() !== req.user.id) {
       return res.status(404).json({ message: 'Comment not found' });
     }
-    console.log('Fetched comment:', comment._id);
     res.json(comment);
   } catch (error) {
-    console.error('Fetch comment error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// GET /api/insights/comments/all - Fetch all comments (admin-only)
 router.get('/comments/all', auth, async (req, res) => {
   try {
     if (!req.user.isAdmin) {
-      console.log('Non-admin attempted to fetch all comments:', req.user.username);
       return res.status(403).json({ message: 'Admin access required' });
     }
     const comments = await Comment.find()
       .populate('userId', 'username profilePicture')
       .populate('insightId', 'title')
       .sort({ createdAt: -1 });
-    console.log('Fetched all comments:', comments.length);
     res.json(comments);
   } catch (error) {
-    console.error('Fetch all comments error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// PUT /api/insights/comments/:commentId - Edit a comment
 router.put('/comments/:commentId', auth, async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -157,12 +130,10 @@ router.put('/comments/:commentId', auth, async (req, res) => {
       .populate('userId', 'username profilePicture');
     res.json(populatedComment);
   } catch (error) {
-    console.error('Edit comment error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// PUT /api/insights/comments/:commentId/hide - Hide or unhide a comment (admin only)
 router.put('/comments/:commentId/hide', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -175,18 +146,15 @@ router.put('/comments/:commentId/hide', auth, async (req, res) => {
     }
     comment.isHidden = !comment.isHidden;
     await comment.save();
-    console.log(`Comment ${comment._id} ${comment.isHidden ? 'hidden' : 'unhidden'}`);
     const populatedComment = await Comment.findById(comment._id)
       .populate('userId', 'username profilePicture')
       .populate('insightId', 'title');
     res.json(populatedComment);
   } catch (error) {
-    console.error('Hide comment error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// DELETE /api/insights/comments/:commentId - Delete a comment
 router.delete('/comments/:commentId', auth, async (req, res) => {
   try {
     const { commentId } = req.params;
@@ -203,7 +171,6 @@ router.delete('/comments/:commentId', auth, async (req, res) => {
     await Comment.deleteMany({ parentCommentId: commentId });
     res.json({ message: 'Comment deleted successfully' });
   } catch (error) {
-    console.error('Delete comment error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

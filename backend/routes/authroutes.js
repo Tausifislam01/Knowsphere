@@ -8,10 +8,8 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const fs = require('fs').promises;
 
-// Multer setup for file uploads
 const upload = multer({ dest: 'uploads/' });
 
-// Helper function to extract public ID from Cloudinary URL
 const getPublicIdFromUrl = (url) => {
   if (!url || !url.includes('cloudinary.com')) {
     return null;
@@ -23,12 +21,10 @@ const getPublicIdFromUrl = (url) => {
     const publicId = afterUpload.replace(/^v\d+\//, '').replace(/\.\w+$/, '');
     return publicId;
   } catch (error) {
-    console.error('Error extracting public ID:', error);
     return null;
   }
 };
 
-// Signup
 router.post('/signup', async (req, res) => {
   const { username, email, password } = req.body;
   try {
@@ -61,12 +57,10 @@ router.post('/signup', async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.status(201).json({ token });
   } catch (error) {
-    console.error('Signup error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Login
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -82,16 +76,13 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get Profile
 router.get('/profile', auth, async (req, res) => {
   try {
     if (!req.user.id) {
-      console.error('No user ID in req.user:', req.user);
       return res.status(401).json({ message: 'Invalid token: No user ID' });
     }
     const user = await User.findById(req.user.id)
@@ -103,12 +94,10 @@ router.get('/profile', auth, async (req, res) => {
     }
     res.json(user);
   } catch (error) {
-    console.error('Get profile error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get Profile by User ID
 router.get('/profile/:userId', auth, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId)
@@ -120,12 +109,10 @@ router.get('/profile/:userId', auth, async (req, res) => {
     }
     res.json(user);
   } catch (error) {
-    console.error('Get user profile error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Update Profile
 router.put('/profile', auth, upload.single('profilePicture'), async (req, res) => {
   const {
     username, email, fullName, bio, workplace, facebook,
@@ -163,21 +150,15 @@ router.put('/profile', auth, upload.single('profilePicture'), async (req, res) =
             oldProfilePicture.includes('cloudinary.com')) {
           const publicId = getPublicIdFromUrl(oldProfilePicture);
           if (publicId) {
-            const deleteResult = await cloudinary.uploader.destroy(publicId);
-            console.log('Old profile picture delete attempt:', { publicId, result: deleteResult });
-            if (deleteResult.result === 'not found') {
-              profilePicture = 'https://via.placeholder.com/150';
-            }
+            await cloudinary.uploader.destroy(publicId);
           } else {
             profilePicture = 'https://via.placeholder.com/150';
           }
         }
       } catch (cloudinaryError) {
-        console.error('Cloudinary upload error:', cloudinaryError);
         try {
           await fs.unlink(req.file.path);
         } catch (unlinkError) {
-          console.error('Failed to delete temporary file:', unlinkError);
         }
         return res.status(500).json({ message: 'Failed to upload image to Cloudinary' });
       }
@@ -210,19 +191,16 @@ router.put('/profile', auth, upload.single('profilePicture'), async (req, res) =
     await user.save();
     res.json(user);
   } catch (error) {
-    console.error('Profile update error:', error);
     if (req.file) {
       try {
         await fs.unlink(req.file.path);
       } catch (unlinkError) {
-        console.error('Failed to delete temporary file:', unlinkError);
       }
     }
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Delete Profile
 router.delete('/delete', auth, async (req, res) => {
   const { password } = req.body;
   try {
@@ -240,20 +218,17 @@ router.delete('/delete', auth, async (req, res) => {
         user.profilePicture.includes('cloudinary.com')) {
       const publicId = getPublicIdFromUrl(user.profilePicture);
       if (publicId) {
-        const deleteResult = await cloudinary.uploader.destroy(publicId);
-        console.log('Profile picture deleted on account deletion:', { publicId, result: deleteResult });
+        await cloudinary.uploader.destroy(publicId);
       }
     }
 
     await User.deleteOne({ _id: user.id });
     res.json({ message: 'Profile deleted' });
   } catch (error) {
-    console.error('Delete profile error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Change Password
 router.put('/change-password', auth, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   try {
@@ -273,12 +248,10 @@ router.put('/change-password', auth, async (req, res) => {
     await user.save();
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
-    console.error('Change password error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Forgot Password
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
   try {
@@ -288,12 +261,10 @@ router.post('/forgot-password', async (req, res) => {
     }
     res.json({ message: 'Password reset instructions sent to your email' });
   } catch (error) {
-    console.error('Forgot password error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Follow a user
 router.post('/follow/:userId', auth, async (req, res) => {
   try {
     const userToFollow = await User.findById(req.params.userId);
@@ -321,12 +292,10 @@ router.post('/follow/:userId', auth, async (req, res) => {
       .populate('following', 'username profilePicture');
     res.json({ message: 'User followed', user: updatedUser });
   } catch (error) {
-    console.error('Follow user error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Unfollow a user
 router.post('/unfollow/:userId', auth, async (req, res) => {
   try {
     const userToUnfollow = await User.findById(req.params.userId);
@@ -355,12 +324,10 @@ router.post('/unfollow/:userId', auth, async (req, res) => {
       .populate('following', 'username profilePicture');
     res.json({ message: 'User unfollowed', user: updatedUser });
   } catch (error) {
-    console.error('Unfollow user error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Follow a tag
 router.post('/follow-tag/:tag', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.id);
@@ -381,12 +348,10 @@ router.post('/follow-tag/:tag', auth, async (req, res) => {
       .populate('following', 'username profilePicture');
     res.json({ message: 'Tag followed', user: updatedUser });
   } catch (error) {
-    console.error('Follow tag error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Unfollow a tag
 router.post('/unfollow-tag/:tag', auth, async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.id);
@@ -409,12 +374,10 @@ router.post('/unfollow-tag/:tag', auth, async (req, res) => {
       .populate('following', 'username profilePicture');
     res.json({ message: 'Tag unfollowed', user: updatedUser });
   } catch (error) {
-    console.error('Unfollow tag error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Assign admin role (for testing, requires adminAuth)
 router.post('/assign-admin/:userId', auth, adminAuth, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
@@ -425,7 +388,6 @@ router.post('/assign-admin/:userId', auth, adminAuth, async (req, res) => {
     await user.save();
     res.json({ message: 'Admin role assigned', user });
   } catch (error) {
-    console.error('Assign admin error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

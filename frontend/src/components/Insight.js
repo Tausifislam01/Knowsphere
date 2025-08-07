@@ -72,7 +72,6 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
         toast.error(data.message || `Failed to ${voteType}`, { autoClose: 2000 });
       }
     } catch (error) {
-      console.error(`${voteType} error:`, error);
       toast.error(`Error ${voteType}ing insight`, { autoClose: 2000 });
     }
   };
@@ -104,7 +103,6 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
     }
   };
 
-  // Function to close the dropdown menu
   const closeDropdown = () => {
     const dropdownMenu = document.querySelector(`#dropdownMenuButton-${insight._id} + .dropdown-menu`);
     if (dropdownMenu) {
@@ -148,7 +146,7 @@ function Insight({ insight, currentUser, onEdit, onDelete }) {
                   className="dropdown-item"
                   onClick={() => {
                     setShowReportForm(true);
-                    closeDropdown(); // Close dropdown without Bootstrap JS
+                    closeDropdown();
                   }}
                 >
                   <i className="bi bi-flag me-2"></i>Report

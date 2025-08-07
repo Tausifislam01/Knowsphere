@@ -14,7 +14,6 @@ function Profile() {
   useEffect(() => {
     const fetchProfileAndInsights = async () => {
       try {
-        // Fetch current user
         const currentUserResponse = await fetch('http://localhost:5000/api/auth/profile', {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -25,7 +24,6 @@ function Profile() {
           setCurrentUser(currentUserData);
         }
 
-        // Fetch profile (own or another user's)
         const profileUrl = userId
           ? `http://localhost:5000/api/auth/profile/${userId}`
           : 'http://localhost:5000/api/auth/profile';
@@ -43,7 +41,6 @@ function Profile() {
         setUser(profileData);
         localStorage.setItem('userId', profileData._id);
 
-        // Fetch insights
         const insightsResponse = await fetch(
           userId
             ? `http://localhost:5000/api/insights/user/${userId}`

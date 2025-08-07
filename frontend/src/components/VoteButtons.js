@@ -1,4 +1,3 @@
-// VoteButtons.js
 import React, { useState } from 'react';
 
 function VoteButtons({ insightId, initialUpvotes, initialDownvotes }) {

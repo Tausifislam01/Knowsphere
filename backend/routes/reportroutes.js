@@ -5,7 +5,6 @@ const Insight = require('../models/Insight');
 const Comment = require('../models/Comment');
 const { auth } = require('../middleware/auth');
 
-// POST /api/reports - Create a report
 router.post('/', auth, async (req, res) => {
   try {
     const { reportedItemType, reportedItemId, reason } = req.body;
@@ -31,7 +30,6 @@ router.post('/', auth, async (req, res) => {
     await report.save();
     res.status(201).json({ message: 'Report submitted', report });
   } catch (error) {
-    console.error('Create report error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

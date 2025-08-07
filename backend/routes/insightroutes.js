@@ -5,13 +5,11 @@ const User = require('../models/User');
 const Comment = require('../models/Comment');
 const { auth } = require('../middleware/auth');
 
-// Initialize Socket.IO
 let io;
 router.setIo = (socketIo) => {
   io = socketIo;
 };
 
-// Helper function to normalize tags
 const normalizeTags = (tags) => {
   if (!tags) return [];
   if (Array.isArray(tags)) {
@@ -23,19 +21,16 @@ const normalizeTags = (tags) => {
   return [];
 };
 
-// Get user-specific insights
 router.get('/', auth, async (req, res) => {
   try {
     const insights = await Insight.find({ userId: req.user.id })
       .populate('userId', 'username profilePicture');
     res.json(insights);
   } catch (error) {
-    console.error('Get user insights error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get public insights
 router.get('/public', async (req, res) => {
   try {
     const insights = await Insight.find({ visibility: 'public', isHidden: false })
@@ -43,12 +38,10 @@ router.get('/public', async (req, res) => {
       .populate('userId', 'username profilePicture');
     res.json(insights);
   } catch (error) {
-    console.error('Get public insights error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get followed insights
 router.get('/followed', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -67,12 +60,10 @@ router.get('/followed', auth, async (req, res) => {
       .sort({ createdAt: -1 });
     res.json(insights);
   } catch (error) {
-    console.error('Get followed insights error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get insights by tag
 router.get('/tags/:tag', auth, async (req, res) => {
   try {
     const { tag } = req.params;
@@ -85,12 +76,10 @@ router.get('/tags/:tag', auth, async (req, res) => {
       .sort({ createdAt: -1 });
     res.json(insights);
   } catch (error) {
-    console.error('Get insights by tag error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get single insight by ID
 router.get('/:id', auth, async (req, res) => {
   try {
     const insight = await Insight.findById(req.params.id).populate('userId', 'username profilePicture');
@@ -106,12 +95,10 @@ router.get('/:id', auth, async (req, res) => {
     }
     res.json(insight);
   } catch (error) {
-    console.error('Get insight error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Get insights by user ID
 router.get('/user/:userId', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -126,12 +113,10 @@ router.get('/user/:userId', auth, async (req, res) => {
       .sort({ createdAt: -1 });
     res.json(insights);
   } catch (error) {
-    console.error('Get user insights error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Create an insight
 router.post('/', auth, async (req, res) => {
   const { title, body, tags, visibility } = req.body;
   try {
@@ -155,17 +140,13 @@ router.post('/', auth, async (req, res) => {
     const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
     if (io) {
       io.emit('newInsight', populatedInsight);
-    } else {
-      console.warn('Socket.IO instance not available for newInsight event');
     }
     res.status(201).json(populatedInsight);
   } catch (error) {
-    console.error('Create insight error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Update an insight
 router.put('/:id', auth, async (req, res) => {
   const { title, body, tags, visibility } = req.body;
   try {
@@ -189,17 +170,13 @@ router.put('/:id', auth, async (req, res) => {
     const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
     if (io) {
       io.emit('insightUpdated', populatedInsight);
-    } else {
-      console.warn('Socket.IO instance not available for insightUpdated event');
     }
     res.json(populatedInsight);
   } catch (error) {
-    console.error('Update insight error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Delete an insight
 router.delete('/:id', auth, async (req, res) => {
   try {
     const insight = await Insight.findById(req.params.id);
@@ -214,17 +191,13 @@ router.delete('/:id', auth, async (req, res) => {
     await Insight.deleteOne({ _id: req.params.id });
     if (io) {
       io.emit('insightDeleted', { id: req.params.id });
-    } else {
-      console.warn('Socket.IO instance not available for insightDeleted event');
     }
     res.json({ message: 'Insight and associated comments deleted' });
   } catch (error) {
-    console.error('Delete insight error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Upvote or downvote an insight
 router.post('/:insightId/vote', auth, async (req, res) => {
   try {
     const { voteType } = req.body;
@@ -261,17 +234,13 @@ router.post('/:insightId/vote', auth, async (req, res) => {
     const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
     if (io) {
       io.emit('insightVoted', { insightId: req.params.insightId, voteType, userId });
-    } else {
-      console.warn('Socket.IO instance not available for insightVoted event');
     }
     res.json({ message: 'Vote updated', insight: populatedInsight });
   } catch (error) {
-    console.error('Vote insight error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Hide or unhide an insight (admin only)
 router.put('/:id/hide', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -284,14 +253,12 @@ router.put('/:id/hide', auth, async (req, res) => {
     }
     insight.isHidden = !insight.isHidden;
     await insight.save();
-    console.log(`Insight ${insight._id} ${insight.isHidden ? 'hidden' : 'unhidden'}`);
     const populatedInsight = await Insight.findById(insight._id).populate('userId', 'username profilePicture');
     if (io) {
       io.emit('insightUpdated', populatedInsight);
     }
     res.json(populatedInsight);
   } catch (error) {
-    console.error('Hide insight error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
