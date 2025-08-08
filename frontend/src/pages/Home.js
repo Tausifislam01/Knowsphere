@@ -1,3 +1,4 @@
+// frontend/src/pages/Home.js
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -87,7 +88,7 @@ function Home({ currentUser }) {
   }, [id, showFollowed]);
 
   const handleEdit = (insightId) => {
-    navigate(`/insights/${insightId}/edit`);
+    navigate(`/insights/edit/${insightId}`); // Fixed to match App.js route
   };
 
   const handleDelete = async (insightId) => {

@@ -1,3 +1,4 @@
+// frontend/src/App.js
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
@@ -35,7 +36,6 @@ function App() {
         const user = await response.json();
         setCurrentUser(user);
         localStorage.setItem('userId', user._id);
-        // Removed toast.success to avoid unnecessary notifications on mount
       } else {
         localStorage.removeItem('token');
         localStorage.removeItem('userId');
@@ -51,12 +51,10 @@ function App() {
     }
   };
 
-  // Run on mount
   useEffect(() => {
     fetchCurrentUser();
   }, []);
 
-  // Handle user update events
   useEffect(() => {
     const handleUserUpdate = (event) => {
       setCurrentUser(event.detail);
@@ -67,7 +65,6 @@ function App() {
     };
   }, []);
 
-  // Callback for Login.js to update currentUser
   const handleLogin = async (token) => {
     localStorage.setItem('token', token);
     await fetchCurrentUser();
@@ -81,8 +78,8 @@ function App() {
           <Route path="/" element={<Home currentUser={currentUser} />} />
           <Route path="/insights/:id" element={<Home currentUser={currentUser} />} />
           <Route path="/tags/:tag" element={<TagInsights currentUser={currentUser} />} />
-          <Route path="/insights/new" element={<InsightForm />} />
-          <Route path="/insights/edit/:insightId" element={<InsightForm />} />
+          <Route path="/insights/new" element={<InsightForm mode="create" />} />
+          <Route path="/insights/edit/:insightId" element={<InsightForm mode="edit" />} />
           <Route path="/profile/:userId" element={<Profile currentUser={currentUser} />} />
           <Route path="/profile" element={<Profile currentUser={currentUser} />} />
           <Route path="/bookmarks" element={<Bookmarks currentUser={currentUser} />} />

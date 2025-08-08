@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import Insight from '../components/Insight';
 
-function Bookmarks() {
+function Bookmarks({ currentUser }) {
   const [bookmarks, setBookmarks] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -22,9 +23,11 @@ function Bookmarks() {
           setBookmarks(data);
         } else {
           setError(data.message || 'Failed to fetch bookmarks');
+          toast.error(data.message || 'Failed to fetch bookmarks', { autoClose: 2000 });
         }
       } catch (error) {
         setError('Error: ' + error.message);
+        toast.error('Error: ' + error.message, { autoClose: 2000 });
         navigate('/login');
       } finally {
         setIsLoading(false);
@@ -37,11 +40,38 @@ function Bookmarks() {
     }
   }, [navigate]);
 
+  const handleEdit = (insightId) => {
+    navigate(`/insights/edit/${insightId}`);
+  };
+
+  const handleDelete = async (insightId) => {
+    if (!window.confirm('Are you sure you want to delete this insight?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/insights/${insightId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (response.ok) {
+        setBookmarks(bookmarks.filter((bookmark) => bookmark.insightId._id !== insightId));
+        toast.success('Insight deleted successfully', { autoClose: 2000 });
+      } else {
+        const data = await response.json();
+        toast.error(data.message || 'Failed to delete insight', { autoClose: 2000 });
+      }
+    } catch (error) {
+      toast.error(`Error deleting insight: ${error.message}`, { autoClose: 2000 });
+    }
+  };
+
   return (
     <div className="container py-5">
       <h2 className="text-center mb-4 text-white">
         <i className="bi bi-bookmark-fill me-2"></i> Your Bookmarks
       </h2>
+      <Link to="/" className="glossy-button btn btn-sm mb-4">
+        <i className="bi bi-arrow-left me-2"></i>Back to Home
+      </Link>
       {error && (
         <div className="alert alert-danger d-flex align-items-center" role="alert">
           <i className="bi bi-exclamation-triangle-fill me-2"></i>
@@ -69,6 +99,9 @@ function Bookmarks() {
             <Insight
               key={bookmark._id}
               insight={bookmark.insightId}
+              currentUser={currentUser}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
             />
           ))}
         </div>
