@@ -7,6 +7,7 @@ const ReportSchema = new mongoose.Schema({
   reason: { type: String, required: true },
   status: { type: String, enum: ['pending', 'resolved', 'dismissed'], default: 'pending' },
   resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Added to store resolving admin
+  resolvedAt: { type: Date, default: null }, // Added for filtering handled reports
   createdAt: { type: Date, default: Date.now },
 });
 
