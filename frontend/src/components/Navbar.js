@@ -1,6 +1,8 @@
+// frontend/src/components/Navbar.js
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import NotificationBell from './NotificationBell';
 
 function Navbar({ currentUser }) {
   const navigate = useNavigate();
@@ -14,8 +16,8 @@ function Navbar({ currentUser }) {
   };
 
   return (
-    <nav className="glossy-navbar navbar navbar-expand-lg navbar-dark sticky-top">
-      <div className="container-fluid">
+    <nav className="glossy-navbar navbar navbar-expand-lg navbar-dark sticky-top w-100">
+      <div className="container-fluid px-3">
         <Link className="navbar-brand" to="/">KnowSphere</Link>
         <button
           className="navbar-toggler"
@@ -28,8 +30,10 @@ function Navbar({ currentUser }) {
         >
           <span className="navbar-toggler-icon"></span>
         </button>
-        <div className="collapse navbar-collapse" id="navbarNav">
-          <div className="navbar-nav ms-auto">
+
+        {/* make the collapsing area take full width and push links right */}
+        <div className="collapse navbar-collapse w-100" id="navbarNav">
+          <div className="navbar-nav ms-auto align-items-center gap-2">
             <Link className="nav-link" to="/">Home</Link>
             {isAuthenticated ? (
               <>
@@ -39,6 +43,9 @@ function Navbar({ currentUser }) {
                   <Link className="nav-link" to="/admin">Admin Dashboard</Link>
                 )}
                 <Link className="nav-link" to="/settings">Settings</Link>
+                <div className="nav-item d-flex align-items-center">
+                  <NotificationBell currentUser={currentUser} />
+                </div>
                 <button
                   className="nav-link btn btn-link"
                   onClick={handleLogout}

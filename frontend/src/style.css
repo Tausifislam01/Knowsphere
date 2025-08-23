@@ -386,3 +386,47 @@ button.btn-primary:hover {
   background-color: #ffffff !important; /* White background for active tab */
   border-color: #dee2e6 #dee2e6 #ffffff !important; /* Match Bootstrap's default tab border */
 }
+/* Navbar width & height tweaks */
+.glossy-navbar { width: 100%; min-height: 56px; }  /* keep a stable height */
+.glossy-navbar .container-fluid { max-width: 100% !important; }
+
+/* Ensure collapse can grow full width and distribute items */
+#navbarNav { flex-grow: 1; }
+.glossy-navbar .navbar-nav { flex-wrap: wrap; }
+
+/* Keep the bell aligned like other nav items */
+.glossy-navbar .navbar-nav .btn.btn-outline-secondary,
+.glossy-navbar .navbar-nav .bi-bell {
+  line-height: 1;
+}
+
+/* AdminDashboard action buttons: consistent sizes & spacing */
+.admin-actions .btn.btn-sm {
+  padding: 0.35rem 0.6rem;          /* ensures 'Unhide' matches 'Hide' height */
+  line-height: 1.2;
+}
+
+/* Make action buttons feel aligned; prevent tiny text from shrinking the button */
+.admin-actions .btn.btn-sm {
+  min-width: 82px;                  /* keeps 'Hide' and 'Unhide' visually equal */
+  text-align: center;
+}
+
+/* Color pass: keep palette consistent and readable */
+.admin-actions .btn-warning {       /* Hide */
+  border-color: #e0a800;
+}
+.admin-actions .btn-primary {       /* Unhide */
+  border-color: #0b5ed7;
+}
+.admin-actions .btn-outline-warning, /* Manage Ban… (not-banned) */
+.admin-actions .btn-outline-danger { /* Manage Ban… (banned) */
+  min-width: 110px;                 /* label is longer */
+}
+
+/* Optional: slightly larger clickable area on tiny screens */
+@media (max-width: 576px) {
+  .admin-actions .btn.btn-sm {
+    min-width: 74px;
+  }
+}

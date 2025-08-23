@@ -10,6 +10,7 @@ const bookmarkRoutes = require('./routes/bookmarkroutes');
 const commentsRoutes = require('./routes/comments');
 const reportRoutes = require('./routes/reportroutes');
 const adminRoutes = require('./routes/adminroutes');
+const notificationRoutes = require('./routes/notificationroutes');
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/insights', commentsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {

@@ -28,8 +28,12 @@ const UserSchema = new mongoose.Schema({
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }],
   followedTags: [{ type: String, default: [] }],
-  isAdmin: { type: Boolean, default: false }, // Added for admin role
-  isBanned: { type: Boolean, default: false }, // Added for banned users
+  isAdmin: { type: Boolean, default: false },
+  isBanned: { type: Boolean, default: false },
+  // 🚀 NEW FIELDS
+  violations: { type: Number, default: 0 },
+  bannedUntil: { type: Date, default: null },
+
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -19,6 +19,27 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Reason is required' });
     }
 
+    // ✅ Throttle: 5 reports per hour per user
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentReports = await Report.countDocuments({
+      reporterId: req.user.id,
+      createdAt: { $gte: oneHourAgo },
+    });
+    if (recentReports >= 5) {
+      return res.status(429).json({ message: 'Report limit reached. Try later.' });
+    }
+
+    // ✅ Dedupe: same reporter, same item, still pending
+    const duplicate = await Report.findOne({
+      reporterId: req.user.id,
+      reportedItemId,
+      reportedItemType,
+      status: 'pending',
+    });
+    if (duplicate) {
+      return res.status(400).json({ message: 'Already reported this item' });
+    }
+
     const Model = reportedItemType === 'Insight' ? Insight : Comment;
     const item = await Model.findById(reportedItemId);
     if (!item) {

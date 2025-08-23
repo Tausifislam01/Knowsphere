@@ -72,7 +72,9 @@ function App() {
   return (
     <Router>
       <div>
+        {/* Navbar already includes NotificationBell */}
         <Navbar currentUser={currentUser} />
+
         <Routes>
           <Route path="/" element={<Home currentUser={currentUser} />} />
           <Route path="/insights" element={<Home currentUser={currentUser} />} />
@@ -89,13 +91,17 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/edit-profile" element={<EditProfile currentUser={currentUser} />} />
           <Route path="/admin" element={<AdminDashboard currentUser={currentUser} />} />
-          <Route path="*" element={
-            <div className="container mt-5">
-              <h2>404 - Page Not Found</h2>
-              <Link to="/" className="glossy-button btn btn-sm">Back to Home</Link>
-            </div>
-          } />
+          <Route
+            path="*"
+            element={
+              <div className="container mt-5">
+                <h2>404 - Page Not Found</h2>
+                <Link to="/" className="glossy-button btn btn-sm">Back to Home</Link>
+              </div>
+            }
+          />
         </Routes>
+
         <ToastContainer
           position="top-right"
           autoClose={2000}

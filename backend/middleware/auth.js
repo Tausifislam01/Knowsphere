@@ -13,9 +13,14 @@ const auth = async (req, res, next) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    if (user.isBanned) {
+
+    // ⬇️ New: honor temporary ban window
+    const now = new Date();
+    const isTempBanned = user.bannedUntil && now < new Date(user.bannedUntil);
+    if (user.isBanned || isTempBanned) {
       return res.status(403).json({ message: 'User is banned' });
     }
+
     req.user = { id: user._id.toString(), ...user.toObject() };
     next();
   } catch (error) {
