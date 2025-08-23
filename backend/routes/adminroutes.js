@@ -1,3 +1,4 @@
+// backend/routes/adminroutes.js
 const express = require('express');
 const router = express.Router();
 const Report = require('../models/Report');
@@ -7,23 +8,20 @@ const User = require('../models/User');
 const Log = require('../models/Log');
 const { auth, adminAuth } = require('../middleware/auth');
 
+// -------- Pending queues --------
 router.get('/insights/reported', auth, adminAuth, async (req, res) => {
   try {
     const insightReports = await Report.find({ reportedItemType: 'Insight', status: 'pending' })
       .populate({
         path: 'reportedItemId',
-        populate: { path: 'userId', select: 'username isBanned isAdmin' },
-      });
+        populate: { path: 'userId', select: 'username isBanned isAdmin profilePicture' },
+      })
+      .populate('reporterId', 'username');
 
-    const reportedInsights = insightReports
-      .filter(report => report.reportedItemId)
-      .map(report => report.reportedItemId)
-      .filter((insight, index, self) => 
-        self.findIndex(i => i._id.toString() === insight._id.toString()) === index
-      );
-
-    res.json(reportedInsights);
+    // Keep all reports; UI can fallback to snapshot if reportedItemId is missing
+    res.json(insightReports);
   } catch (error) {
+    console.error('Fetch reported insights error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -33,22 +31,21 @@ router.get('/comments/reported', auth, adminAuth, async (req, res) => {
     const commentReports = await Report.find({ reportedItemType: 'Comment', status: 'pending' })
       .populate({
         path: 'reportedItemId',
-        populate: { path: 'userId', select: 'username isBanned isAdmin' },
-      });
+        populate: [
+          { path: 'userId', select: 'username isBanned isAdmin profilePicture' },
+          { path: 'insightId', select: 'title' },
+        ],
+      })
+      .populate('reporterId', 'username');
 
-    const reportedComments = commentReports
-      .filter(report => report.reportedItemId)
-      .map(report => report.reportedItemId)
-      .filter((comment, index, self) => 
-        self.findIndex(c => c._id.toString() === comment._id.toString()) === index
-      );
-
-    res.json(reportedComments);
+    res.json(commentReports);
   } catch (error) {
+    console.error('Fetch reported comments error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
+// -------- Logs / handled reports --------
 router.get('/logs', auth, adminAuth, async (req, res) => {
   try {
     const { action, adminId, startDate, endDate } = req.query;
@@ -62,178 +59,9 @@ router.get('/logs', auth, adminAuth, async (req, res) => {
     }
     const logs = await Log.find(query)
       .populate('adminId', 'username')
+      .populate('targetId', 'title text username')
       .sort({ createdAt: -1 });
     res.json(logs);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.post('/reports/:reportId/resolve', auth, adminAuth, async (req, res) => {
-  try {
-    const { status } = req.body;
-    if (!['resolved', 'dismissed'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
-    }
-    const report = await Report.findById(req.params.reportId);
-    if (!report) {
-      return res.status(404).json({ message: 'Report not found' });
-    }
-    report.status = status;
-    report.resolvedBy = req.user.id;
-    report.resolvedAt = Date.now();
-    await report.save();
-
-    await Log.create({
-      action: 'resolve_report',
-      adminId: req.user.id,
-      targetId: req.params.reportId,
-      targetType: 'Report',
-      details: `Report ${req.params.reportId} ${status} by admin`,
-    });
-
-    res.json({ message: `Report ${status}`, report });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.put('/insights/:insightId/hide', auth, adminAuth, async (req, res) => {
-  try {
-    const insight = await Insight.findById(req.params.insightId);
-    if (!insight) {
-      return res.status(404).json({ message: 'Insight not found' });
-    }
-    insight.isHidden = !insight.isHidden;
-    await insight.save();
-
-    await Log.create({
-      action: insight.isHidden ? 'hide_insight' : 'unhide_insight',
-      adminId: req.user.id,
-      targetId: req.params.insightId,
-      targetType: 'Insight',
-      details: `Insight ${req.params.insightId} ${insight.isHidden ? 'hidden' : 'unhidden'} by admin`,
-    });
-
-    res.json({ message: `Insight ${insight.isHidden ? 'hidden' : 'unhidden'}`, insight });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.delete('/insights/:insightId', auth, adminAuth, async (req, res) => {
-  try {
-    const insight = await Insight.findById(req.params.insightId);
-    if (!insight) return res.status(404).json({ message: 'Insight not found' });
-    await Comment.deleteMany({ insightId: req.params.insightId });
-    await Report.deleteMany({ reportedItemType: 'Insight', reportedItemId: req.params.insightId });
-    await Insight.deleteOne({ _id: req.params.insightId });
-
-    await Log.create({
-      action: 'delete_insight',
-      adminId: req.user.id,
-      targetId: req.params.insightId,
-      targetType: 'Insight',
-      details: `Insight ${req.params.insightId} deleted by admin`,
-    });
-
-    if (req.io) {
-      req.io.emit('insightDeleted', { id: req.params.insightId });
-    }
-    res.json({ message: 'Insight and associated comments/reports deleted' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.post('/comments/:commentId/hide', auth, adminAuth, async (req, res) => {
-  try {
-    const comment = await Comment.findById(req.params.commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    comment.isHidden = !comment.isHidden;
-    await comment.save();
-
-    await Log.create({
-      action: comment.isHidden ? 'hide_comment' : 'unhide_comment',
-      adminId: req.user.id,
-      targetId: req.params.commentId,
-      targetType: 'Comment',
-      details: `Comment ${req.params.commentId} ${comment.isHidden ? 'hidden' : 'unhidden'} by admin`,
-    });
-
-    if (req.io) {
-      req.io.emit('commentUpdated', comment);
-    }
-    res.json({ message: `Comment ${comment.isHidden ? 'hidden' : 'unhidden'}`, comment });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.delete('/comments/:commentId', auth, adminAuth, async (req, res) => {
-  try {
-    const comment = await Comment.findById(req.params.commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    await Report.deleteMany({ reportedItemType: 'Comment', reportedItemId: req.params.commentId });
-    await Comment.deleteOne({ _id: req.params.commentId });
-
-    await Log.create({
-      action: 'delete_comment',
-      adminId: req.user.id,
-      targetId: req.params.commentId,
-      targetType: 'Comment',
-      details: `Comment ${req.params.commentId} deleted by admin`,
-    });
-
-    if (req.io) {
-      req.io.emit('commentDeleted', { id: req.params.commentId });
-    }
-    res.json({ message: 'Comment and associated reports deleted' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.post('/users/:userId/ban', auth, adminAuth, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.isAdmin) {
-      return res.status(403).json({ message: 'Cannot ban an admin' });
-    }
-    user.isBanned = true;
-    await user.save();
-
-    await Log.create({
-      action: 'ban_user',
-      adminId: req.user.id,
-      targetId: req.params.userId,
-      targetType: 'User',
-      details: `User ${req.params.userId} banned by admin`,
-    });
-
-    res.json({ message: 'User banned', user });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.post('/users/:userId/unban', auth, adminAuth, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    user.isBanned = false;
-    await user.save();
-
-    await Log.create({
-      action: 'unban_user',
-      adminId: req.user.id,
-      targetId: req.params.userId,
-      targetType: 'User',
-      details: `User ${req.params.userId} unbanned by admin`,
-    });
-
-    res.json({ message: 'User unbanned', user });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -251,6 +79,7 @@ router.get('/handled-reports', auth, adminAuth, async (req, res) => {
       if (startDate) query.resolvedAt.$gte = new Date(startDate);
       if (endDate) query.resolvedAt.$lte = new Date(endDate);
     }
+
     const reports = await Report.find(query)
       .populate('reporterId', 'username')
       .populate({
@@ -259,27 +88,212 @@ router.get('/handled-reports', auth, adminAuth, async (req, res) => {
       })
       .populate('resolvedBy', 'username')
       .sort({ resolvedAt: -1 });
+
     res.json(reports);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
 });
 
+// -------- User enforcement --------
+router.post('/users/:userId/ban', auth, adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.isAdmin) return res.status(403).json({ message: 'Cannot ban an admin' });
+
+    user.isBanned = true;
+    await user.save();
+
+    await Log.create({
+      action: 'ban_user',
+      adminId: req.user.id,
+      targetId: user._id,
+      targetType: 'User',
+      details: `User ${user.username} banned by admin ${req.user.id}`,
+    });
+
+    res.json({ message: 'User banned', user });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/users/:userId/unban', auth, adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.isBanned = false;
+    await user.save();
+
+    await Log.create({
+      action: 'unban_user',
+      adminId: req.user.id,
+      targetId: user._id,
+      targetType: 'User',
+      details: `User ${user.username} unbanned by admin ${req.user.id}`,
+    });
+
+    res.json({ message: 'User unbanned', user });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// -------- Resolve/Dismiss a report --------
+router.post('/reports/:reportId/resolve', auth, adminAuth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['resolved', 'dismissed'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    const report = await Report.findById(req.params.reportId);
+    if (!report) return res.status(404).json({ message: 'Report not found' });
+
+    report.status = status;
+    report.resolvedBy = req.user.id;
+    report.resolvedAt = new Date();
+    await report.save();
+
+    await Log.create({
+      action: `resolve_report_${status}`,
+      adminId: req.user.id,
+      targetId: report._id,
+      targetType: 'Report',
+      details: `Report ${report._id} ${status} by admin ${req.user.id}`,
+    });
+
+    res.json({ message: `Report ${status}`, report });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// -------- Content actions (with auto-resolve of pending reports) --------
+router.put('/insights/:insightId/hide', auth, adminAuth, async (req, res) => {
+  try {
+    const insight = await Insight.findById(req.params.insightId);
+    if (!insight) return res.status(404).json({ message: 'Insight not found' });
+
+    insight.isHidden = !insight.isHidden;
+    await insight.save();
+
+    await Log.create({
+      action: insight.isHidden ? 'hide_insight' : 'unhide_insight',
+      adminId: req.user.id,
+      targetId: insight._id,
+      targetType: 'Insight',
+      details: `Insight ${insight._id} ${insight.isHidden ? 'hidden' : 'unhidden'} by admin ${req.user.id}`,
+    });
+
+    res.json(insight);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.delete('/insights/:insightId', auth, adminAuth, async (req, res) => {
+  try {
+    const insight = await Insight.findById(req.params.insightId);
+    if (!insight) return res.status(404).json({ message: 'Insight not found' });
+
+    await Insight.deleteOne({ _id: req.params.insightId });
+    await Comment.deleteMany({ insightId: req.params.insightId });
+
+    // Auto-resolve any pending reports referencing this insight
+    await Report.updateMany(
+      { reportedItemType: 'Insight', reportedItemId: req.params.insightId, status: 'pending' },
+      { $set: { status: 'resolved', resolvedBy: req.user.id, resolvedAt: new Date() } }
+    );
+
+    await Log.create({
+      action: 'delete_insight',
+      adminId: req.user.id,
+      targetId: insight._id,
+      targetType: 'Insight',
+      details: `Insight ${insight._id} deleted by admin ${req.user.id}`,
+    });
+
+    res.json({ message: 'Insight deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/comments/:commentId/hide', auth, adminAuth, async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Comment not found' });
+
+    comment.isHidden = !comment.isHidden;
+    await comment.save();
+
+    await Log.create({
+      action: comment.isHidden ? 'hide_comment' : 'unhide_comment',
+      adminId: req.user.id,
+      targetId: comment._id,
+      targetType: 'Comment',
+      details: `Comment ${comment._id} ${comment.isHidden ? 'hidden' : 'unhidden'} by admin ${req.user.id}`,
+    });
+
+    res.json(comment);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.delete('/comments/:commentId', auth, adminAuth, async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Comment not found' });
+
+    await Comment.deleteOne({ _id: req.params.commentId });
+    await Insight.findByIdAndUpdate(comment.insightId, { $inc: { commentCount: -1 } });
+
+    // also delete replies
+    await Comment.deleteMany({ parentCommentId: req.params.commentId });
+
+    // Auto-resolve any pending reports referencing this comment
+    await Report.updateMany(
+      { reportedItemType: 'Comment', reportedItemId: req.params.commentId, status: 'pending' },
+      { $set: { status: 'resolved', resolvedBy: req.user.id, resolvedAt: new Date() } }
+    );
+
+    await Log.create({
+      action: 'delete_comment',
+      adminId: req.user.id,
+      targetId: comment._id,
+      targetType: 'Comment',
+      details: `Comment ${comment._id} deleted by admin ${req.user.id}`,
+    });
+
+    res.json({ message: 'Comment deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// -------- Metrics --------
 router.get('/user-report-count/:userId', auth, adminAuth, async (req, res) => {
   try {
     const userId = req.params.userId;
     const insights = await Insight.find({ userId }).select('_id');
-    const insightIds = insights.map(i => i._id);
+    const insightIds = insights.map((i) => i._id);
+
     const insightReportCount = await Report.countDocuments({
       reportedItemType: 'Insight',
-      reportedItemId: { $in: insightIds }
+      reportedItemId: { $in: insightIds },
     });
+
     const comments = await Comment.find({ userId }).select('_id');
-    const commentIds = comments.map(c => c._id);
+    const commentIds = comments.map((c) => c._id);
+
     const commentReportCount = await Report.countDocuments({
       reportedItemType: 'Comment',
-      reportedItemId: { $in: commentIds }
+      reportedItemId: { $in: commentIds },
     });
+
     const totalCount = insightReportCount + commentReportCount;
     res.json({ count: totalCount });
   } catch (error) {

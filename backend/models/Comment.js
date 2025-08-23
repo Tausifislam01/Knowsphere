@@ -8,7 +8,7 @@ const CommentSchema = new Schema({
   parentCommentId: { type: Schema.Types.ObjectId, ref: 'Comment', default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date },
-  isHidden: { type: Boolean, default: false } // Added for admin hide/unhide functionality
+  isHidden: { type: Boolean, default: false } 
 });
 
 module.exports = mongoose.model('Comment', CommentSchema);

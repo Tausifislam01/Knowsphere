@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 
 function Navbar({ currentUser }) {
   const navigate = useNavigate();
-  const isAuthenticated = !!currentUser;
+  const isAuthenticated = !!(currentUser && currentUser._id);
 
   const handleLogout = () => {
     localStorage.removeItem('token');

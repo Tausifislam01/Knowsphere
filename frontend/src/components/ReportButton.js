@@ -8,8 +8,8 @@ const ReportButton = ({ itemId, itemType, currentUser, onClose }) => {
   const [showForm, setShowForm] = useState(true); // Form is always shown when component is rendered
   const [error, setError] = useState('');
 
-  // Prevent rendering if user is the content owner
-  if (!currentUser || (itemType === 'Insight' && currentUser._id === itemId?.userId?._id)) {
+  // Prevent rendering if user is the content owner (handled in parent for insights)
+  if (!currentUser) {
     return null;
   }
 

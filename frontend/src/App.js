@@ -1,4 +1,3 @@
-// frontend/src/App.js
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
@@ -76,6 +75,8 @@ function App() {
         <Navbar currentUser={currentUser} />
         <Routes>
           <Route path="/" element={<Home currentUser={currentUser} />} />
+          <Route path="/insights" element={<Home currentUser={currentUser} />} />
+          <Route path="/insights/search" element={<Home currentUser={currentUser} />} />
           <Route path="/insights/:id" element={<Home currentUser={currentUser} />} />
           <Route path="/tags/:tag" element={<TagInsights currentUser={currentUser} />} />
           <Route path="/insights/new" element={<InsightForm mode="create" />} />

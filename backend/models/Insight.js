@@ -11,7 +11,8 @@ const InsightSchema = new mongoose.Schema({
   commentCount: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date },
-  isHidden: { type: Boolean, default: false } // Added for admin hide/unhide functionality
+  isHidden: { type: Boolean, default: false }, // Added for admin hide/unhide functionality
+  embedding: { type: [Number], default: [] } // AI embedding vector
 });
 
 module.exports = mongoose.model('Insight', InsightSchema);

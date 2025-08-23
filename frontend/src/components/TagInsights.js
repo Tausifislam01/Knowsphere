@@ -25,15 +25,19 @@ function TagInsights({ currentUser }) {
         if (response.ok) {
           const data = await response.json();
           setInsights(Array.isArray(data) ? data : []);
+        } else if (response.status === 404) {
+          setError(`No insights found for tag "${tag}"`);
+          toast.error(`No insights found for tag "${tag}"`, { autoClose: 2000 });
         } else {
-          const errorData = await response.json();
-          toast.error(errorData.message || 'Failed to fetch insights', { autoClose: 2000 });
+          const text = await response.text(); // Get raw response for debugging
+          console.error('Non-JSON response:', text);
           setError('Failed to fetch insights with this tag');
+          toast.error('Failed to fetch insights', { autoClose: 2000 });
         }
       } catch (error) {
-        console.error('Fetch tag insights error:', error);
-        toast.error('Error fetching insights', { autoClose: 2000 });
+        console.error('Fetch tag insights error:', error.message);
         setError('Error connecting to the server');
+        toast.error('Error connecting to the server', { autoClose: 2000 });
       } finally {
         setIsLoading(false);
       }

@@ -21,10 +21,11 @@ function BookmarkButton({ insightId, className }) {
         });
         const bookmarks = await response.json();
         if (response.ok) {
-          setIsBookmarked(bookmarks.some((bookmark) => bookmark.insightId._id === insightId));
+          setIsBookmarked(bookmarks.some((bookmark) => bookmark.insightId?._id === insightId));
         }
       } catch (error) {
-        console.error('Error checking bookmark:', error);
+        setError('Error checking bookmark');
+        toast.error('Error checking bookmark', { autoClose: 2000 });
       }
     };
     if (localStorage.getItem('token')) {

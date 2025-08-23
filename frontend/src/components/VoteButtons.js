@@ -1,10 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { io } from 'socket.io-client';
+
+const BACKEND_URL = 'http://localhost:5000';
+const socket = io(BACKEND_URL, {
+  auth: { token: localStorage.getItem('token') },
+});
 
 function VoteButtons({ insightId, initialUpvotes, initialDownvotes }) {
   const [upvotes, setUpvotes] = useState(initialUpvotes || []);
   const [downvotes, setDownvotes] = useState(initialDownvotes || []);
   const [error, setError] = useState('');
   const userId = localStorage.getItem('userId');
+
+  // Listen for real-time vote updates
+  useEffect(() => {
+    socket.on('insightVoted', ({ insightId: votedInsightId, voteType, userId: voterId }) => {
+      if (votedInsightId === insightId) {
+        // Fetch updated insight to ensure accurate vote counts
+        fetch(`http://localhost:5000/api/insights/${insightId}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        })
+          .then(response => response.json())
+          .then(data => {
+            setUpvotes(data.upvotes || []);
+            setDownvotes(data.downvotes || []);
+          })
+          .catch(err => {
+            console.error('Error fetching updated insight:', err.message);
+            setError('Failed to update vote counts');
+          });
+      }
+    });
+
+    return () => {
+      socket.off('insightVoted');
+    };
+  }, [insightId]);
 
   const handleVote = async (voteType) => {
     setError('');
@@ -19,10 +52,11 @@ function VoteButtons({ insightId, initialUpvotes, initialDownvotes }) {
       });
       const data = await response.json();
       if (response.ok) {
-        setUpvotes(data.insight.upvotes);
-        setDownvotes(data.insight.downvotes);
+        // Backend returns insight object directly
+        setUpvotes(data.upvotes || []);
+        setDownvotes(data.downvotes || []);
       } else {
-        setError(data.message || 'Failed to vote');
+        setError(data.message || `Failed to ${voteType}`);
       }
     } catch (error) {
       setError('Error: ' + error.message);

@@ -44,21 +44,20 @@ app.use('/api/admin', adminRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  
 
   socket.on('disconnect', () => {
-   
+    
   });
 });
 
 // MongoDB connection
 mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGO_URI, {})
   .then(() => console.log('Connected to MongoDB Atlas'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+  .catch((err) => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1); // Exit process on connection failure
+  });
 
 // Start server
 const PORT = process.env.PORT || 5000;

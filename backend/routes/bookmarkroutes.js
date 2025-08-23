@@ -30,12 +30,9 @@ router.post('/', auth, async (req, res) => {
     });
     if (req.io) {
       req.io.emit('bookmarkAdded', { userId: req.user.id, insightId });
-    } else {
-      console.warn('Socket.IO instance not available for bookmarkAdded event');
     }
     res.status(201).json(populatedBookmark);
   } catch (error) {
-    console.error('Create bookmark error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -45,11 +42,13 @@ router.get('/', auth, async (req, res) => {
   try {
     const bookmarks = await Bookmark.find({ userId: req.user.id }).populate({
       path: 'insightId',
+      match: { _id: { $exists: true } }, // Ensure insightId exists
       populate: { path: 'userId', select: 'username profilePicture' },
     });
-    res.json(bookmarks);
+    // Filter out bookmarks with null insightId
+    const validBookmarks = bookmarks.filter(bookmark => bookmark.insightId !== null);
+    res.json(validBookmarks);
   } catch (error) {
-    console.error('Fetch bookmarks error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -59,11 +58,13 @@ router.get('/all', auth, adminAuth, async (req, res) => {
   try {
     const bookmarks = await Bookmark.find().populate({
       path: 'insightId',
+      match: { _id: { $exists: true } }, // Ensure insightId exists
       populate: { path: 'userId', select: 'username profilePicture' },
     }).populate('userId', 'username');
-    res.json(bookmarks);
+    // Filter out bookmarks with null insightId
+    const validBookmarks = bookmarks.filter(bookmark => bookmark.insightId !== null);
+    res.json(validBookmarks);
   } catch (error) {
-    console.error('Fetch all bookmarks error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -78,12 +79,9 @@ router.delete('/:insightId', auth, async (req, res) => {
     await Bookmark.deleteOne({ _id: bookmark._id });
     if (req.io) {
       req.io.emit('bookmarkRemoved', { userId: req.user.id, insightId: req.params.insightId });
-    } else {
-      console.warn('Socket.IO instance not available for bookmarkRemoved event');
     }
     res.json({ message: 'Bookmark deleted' });
   } catch (error) {
-    console.error('Delete bookmark error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
