@@ -9,7 +9,10 @@ const callHuggingFaceAPI = async (model, payload, task = 'models') => {
     if (!HUGGINGFACE_API_KEY) {
       throw new Error('HUGGINGFACE_API_KEY is not defined in .env file');
     }
-    let endpoint = task === 'feature-extraction' ? `pipeline/feature-extraction/${model}` : `${task}/${model}`;
+    let endpoint = task === 'feature-extraction'
+      ? `pipeline/feature-extraction/${model}`
+      : `${task}/${model}`;
+
     console.log(`Calling Hugging Face API: ${HUGGINGFACE_API_URL}/${endpoint}`);
     const response = await axios.post(
       `${HUGGINGFACE_API_URL}/${endpoint}`,
@@ -24,7 +27,6 @@ const callHuggingFaceAPI = async (model, payload, task = 'models') => {
     console.log(`API response for ${model}:`, response.data);
     return response.data;
   } catch (error) {
-    // Silently handle errors without logging
     if (error.response?.status === 429) {
       throw new Error('Rate limit reached. Please check your Hugging Face free tier quota or upgrade to PRO.');
     }

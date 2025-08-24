@@ -60,6 +60,46 @@ export const getRelatedInsights = async (insightId, limit = 5) => {
   return handleApiError(response, 'Failed to fetch related insights');
 };
 
+export const getTrendingInsights = async (window = '7d', limit = 50, q = '', tag = '') => {
+  const params = new URLSearchParams({ window: String(window), limit: String(limit) });
+  if (q && q.trim()) params.set('q', q.trim());
+  if (tag && tag.trim()) params.set('tag', tag.trim());
+  const response = await fetch(
+    `${API_URL}/insights/trending?${params.toString()}`,
+    getAuthHeaders()
+  );
+  return handleApiError(response, 'Failed to fetch trending insights');
+};
+
+export const translateText = async (text, targetLang) => {
+  const response = await fetch(`${API_URL}/insights/translate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders().headers,
+    },
+    body: JSON.stringify({ text, targetLang }),
+  });
+  return handleApiError(response, 'Failed to translate');
+};
+
+/* ----------------------------------------
+   Users
+-----------------------------------------*/
+
+// UPDATED: search users by username, with options (excludeAdmins, limit)
+export const searchUsers = async (query, limit = 20, opts = {}) => {
+  const params = new URLSearchParams();
+  if (query && query.trim()) params.set('q', query.trim());
+  params.set('limit', String(limit));
+  if (opts.excludeAdmins === true) params.set('excludeAdmins', 'true');
+
+  const response = await fetch(`${API_URL}/auth/users/search?${params.toString()}`, {
+    ...getAuthHeaders()
+  });
+  return handleApiError(response, 'Failed to search users');
+};
+
 /* ----------------------------------------
    Reports (create / fetch / resolve)
 -----------------------------------------*/
@@ -97,7 +137,6 @@ export const resolveReport = async (reportId, status = 'resolved') => {
   return handleApiError(response, 'Failed to resolve report');
 };
 
-// With resolution note (used by AdminDashboard modal)
 export const resolveReportWithNote = async (
   reportId,
   status = 'resolved',

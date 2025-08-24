@@ -1,348 +1,557 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import Insight from './Insight';
+// src/components/Profile.js
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import FollowButton from './FollowButton';
+import Insight from './Insight';
 
-function Profile() {
-  const { userId } = useParams();
-  const [user, setUser] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [insights, setInsights] = useState([]);
-  const [error, setError] = useState('');
+function Profile({ currentUser }) {
   const navigate = useNavigate();
+  const { userId: paramUserId } = useParams();
 
+  const [headerUser, setHeaderUser] = useState(null);     // profile owner data
+  const [insights, setInsights] = useState([]);
+  const [activeTab, setActiveTab] = useState('insights'); // insights | about | followers | following
+  const [loading, setLoading] = useState(true);
+  const [insightsLoading, setInsightsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Followers / Following (expanded mini user objects)
+  const [followersExpanded, setFollowersExpanded] = useState([]);
+  const [followingExpanded, setFollowingExpanded] = useState([]);
+  const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
+
+  // Back-to-top
+  const [showTop, setShowTop] = useState(false);
+
+  const isOwner = useMemo(() => {
+    if (!headerUser || !currentUser) return false;
+    return String(headerUser._id) === String(currentUser._id);
+  }, [headerUser, currentUser]);
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return token
+      ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      : { 'Content-Type': 'application/json' };
+  };
+
+  // Load profile header (owner or target user)
   useEffect(() => {
-    const fetchProfileAndInsights = async () => {
+    const loadHeader = async () => {
+      setLoading(true);
+      setError('');
       try {
-        const currentUserResponse = await fetch('http://localhost:5000/api/auth/profile', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        if (currentUserResponse.ok) {
-          const currentUserData = await currentUserResponse.json();
-          setCurrentUser(currentUserData);
+        const url = paramUserId
+          ? `http://localhost:5000/api/auth/profile/${paramUserId}`
+          : `http://localhost:5000/api/auth/profile`;
+        const res = await fetch(url, { headers: getAuthHeaders() });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.message || 'Failed to load profile');
         }
+        const user = await res.json();
+        setHeaderUser(user);
+      } catch (e) {
+        setError(e.message);
+        toast.error(e.message, { autoClose: 2000 });
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadHeader();
+  }, [paramUserId]);
 
-        const profileUrl = userId
-          ? `http://localhost:5000/api/auth/profile/${userId}`
-          : 'http://localhost:5000/api/auth/profile';
-        const profileResponse = await fetch(profileUrl, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        const profileData = await profileResponse.json();
-        if (!profileResponse.ok) {
-          setError(profileData.message || 'Failed to fetch profile');
-          navigate('/login');
-          return;
-        }
-        setUser(profileData);
-        localStorage.setItem('userId', profileData._id);
-
-        const insightsResponse = await fetch(
-          userId
-            ? `http://localhost:5000/api/insights/user/${userId}`
-            : 'http://localhost:5000/api/insights',
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
-          }
+  // Load that user's insights (respect owner/admin visibility on backend)
+  useEffect(() => {
+    const loadInsights = async () => {
+      if (!headerUser?._id) return;
+      setInsightsLoading(true);
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/insights/user/${headerUser._id}`,
+          { headers: getAuthHeaders() }
         );
-        const insightsData = await insightsResponse.json();
-        if (insightsResponse.ok) {
-          setInsights(insightsData);
-        } else {
-          setError(insightsData.message || 'Failed to fetch insights');
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.message || 'Failed to load insights');
         }
-      } catch (error) {
-        setError('Error: ' + error.message);
-        navigate('/login');
+        const list = await res.json();
+        setInsights(Array.isArray(list) ? list : []);
+      } catch (e) {
+        toast.error(e.message, { autoClose: 2000 });
+      } finally {
+        setInsightsLoading(false);
       }
     };
+    loadInsights();
+  }, [headerUser]);
 
-    const handleUserUpdate = (event) => {
-      setCurrentUser(event.detail);
-      if (!userId || userId === event.detail._id) {
-        setUser(event.detail);
+  // Expand follower/following IDs to mini user objects
+  const expandUserIds = useCallback(async (ids = []) => {
+    const arr = Array.isArray(ids) ? ids : [];
+    const results = [];
+    for (const item of arr) {
+      // if already a populated object, keep it
+      if (item && typeof item === 'object' && (item.username || item._id)) {
+        results.push(item);
+        continue;
+      }
+      try {
+        const res = await fetch(`http://localhost:5000/api/auth/profile/${item}`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          results.push(await res.json());
+        }
+      } catch {
+        // ignore individual failures
+      }
+    }
+    return results;
+  }, []);
+
+  // After header user loads, fetch followers/following lists
+  useEffect(() => {
+    const loadSocialLists = async () => {
+      if (!headerUser) return;
+      setLoadingFollowers(true);
+      setLoadingFollowing(true);
+      try {
+        const [follows, following] = await Promise.all([
+          expandUserIds(headerUser.followers),
+          expandUserIds(headerUser.following),
+        ]);
+        setFollowersExpanded(follows);
+        setFollowingExpanded(following);
+      } finally {
+        setLoadingFollowers(false);
+        setLoadingFollowing(false);
       }
     };
-    window.addEventListener('userUpdated', handleUserUpdate);
+    loadSocialLists();
+  }, [headerUser, expandUserIds]);
 
-    fetchProfileAndInsights();
+  // Back-to-top visibility
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 240);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
-    return () => {
-      window.removeEventListener('userUpdated', handleUserUpdate);
-    };
-  }, [navigate, userId]);
+  const handleEditProfile = () => navigate('/edit-profile');
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userId');
-    navigate('/login', { replace: true });
-  };
-
-  const handleEditInsight = (insightId) => {
-    navigate(`/insights/edit/${insightId}`);
-  };
-
-  const handleDeleteInsight = async (insightId) => {
-    if (!window.confirm('Are you sure you want to delete this insight?')) return;
+  const copyProfileLink = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/insights/${insightId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      if (response.ok) {
-        setInsights(insights.filter((insight) => insight._id !== insightId));
-      } else {
-        const data = await response.json();
-        setError(data.message || 'Failed to delete insight');
-      }
-    } catch (error) {
-      setError('Error: ' + error.message);
+      const url = window.location.href;
+      await navigator.clipboard.writeText(url);
+      toast.success('Profile link copied', { autoClose: 1500 });
+    } catch {
+      toast.error('Copy failed', { autoClose: 1500 });
     }
   };
 
-  if (!user) return <div className="container text-center mt-5">Loading...</div>;
+  const shareProfile = async () => {
+    const url = window.location.href;
+    const title = headerUser?.fullName || headerUser?.username || 'Profile';
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied (no native share available)', { autoClose: 1500 });
+      }
+    } catch {
+      /* share cancelled */
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container py-5 text-center">
+        <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }} role="status">
+          <span className="visually-hidden">Loading profile…</span>
+        </div>
+        <p className="mt-3">Loading profile…</p>
+      </div>
+    );
+  }
+
+  if (error || !headerUser) {
+    return (
+      <div className="container py-5">
+        <div className="alert alert-danger d-flex align-items-center">
+          <i className="bi bi-exclamation-triangle-fill me-2"></i>
+          <div>{error || 'Profile not found'}</div>
+        </div>
+        <Link to="/" className="glossy-button btn btn-sm">Back to Home</Link>
+      </div>
+    );
+  }
+
+  const placeholderAv = 'https://via.placeholder.com/150';
+  const followerCount = headerUser.followers?.length || 0;
+  const followingCount = headerUser.following?.length || 0;
+  const insightsCount = insights.length;
 
   return (
-    <div className="container-fluid py-4">
-      <div className="row g-4">
-        <div className="col-lg-3">
-          <div className="card glossy-card h-100">
-            <div className="card-body d-flex flex-column align-items-center py-4">
+    <div className="container py-4">
+      {/* Header card: SIDE-BY-SIDE avatar + identity to utilize space */}
+      <div className="card glossy-card shadow-sm mb-4">
+        <div className="card-body">
+          <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+            {/* Avatar (left) */}
+            <div className="d-flex align-items-center gap-3">
               <img
-                src={user.profilePicture || 'https://via.placeholder.com/150'}
-                className="rounded-circle border border-4 border-light shadow mb-3"
-                alt="Profile"
-                style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                onError={(e) => (e.target.src = 'https://via.placeholder.com/150')}
+                src={headerUser.profilePicture || placeholderAv}
+                alt={headerUser.username}
+                className="rounded-circle border border-3 border-dark-subtle"
+                style={{ width: 104, height: 104, objectFit: 'cover' }}
+                onError={(e) => (e.currentTarget.src = placeholderAv)}
               />
-              <h4 className="card-title mb-1">{user.fullName || user.username}</h4>
-              <p className="text-muted mb-3">{user.bio || 'No bio available'}</p>
-              {userId && userId !== currentUser?._id && (
-                <FollowButton userId={userId} currentUser={currentUser} />
-              )}
-              <div className="w-100 px-3 mb-3">
-                <div className="d-flex align-items-center mb-2">
-                  <i className="bi bi-envelope me-2 text-primary"></i>
-                  <span className="text-truncate">{user.email}</span>
+              {/* Identity (right to avatar) */}
+              <div>
+                <h1 className="h4 mb-1">{headerUser.fullName || headerUser.username}</h1>
+                <div className="text-muted">@{headerUser.username}</div>
+                {headerUser.bio && <p className="mt-2 mb-0 text-body">{headerUser.bio}</p>}
+                <div className="mt-2 d-flex flex-wrap gap-3 small text-muted">
+                  {headerUser.location && (
+                    <span><i className="bi bi-geo-alt me-1"></i>{headerUser.location}</span>
+                  )}
+                  {headerUser.workplace && (
+                    <span><i className="bi bi-briefcase me-1"></i>{headerUser.workplace}</span>
+                  )}
                 </div>
-                {user.workplace && (
-                  <div className="d-flex align-items-center mb-2">
-                    <i className="bi bi-briefcase me-2 text-primary"></i>
-                    <span>{user.workplace}</span>
-                  </div>
-                )}
-                {user.location && (
-                  <div className="d-flex align-items-center mb-2">
-                    <i className="bi bi-geo-alt me-2 text-primary"></i>
-                    <span>{user.location}</span>
-                  </div>
-                )}
-                {!user.genderPrivacy && user.gender && (
-                  <div className="d-flex align-items-center mb-2">
-                    <i className="bi bi-person-fill me-2 text-primary"></i>
-                    <span>{user.gender}</span>
-                  </div>
-                )}
-                {user.facebook && (
-                  <div className="d-flex align-items-center mb-2">
-                    <i className="bi bi-facebook me-2 text-primary"></i>
-                    <a href={user.facebook} target="_blank" rel="noopener noreferrer">Facebook</a>
-                  </div>
-                )}
-                {user.linkedin && (
-                  <div className="d-flex align-items-center mb-2">
-                    <i className="bi bi-linkedin me-2 text-primary"></i>
-                    <a href={user.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>
-                  </div>
-                )}
-                {user.github && (
-                  <div className="d-flex align-items-center mb-2">
-                    <i className="bi bi-github me-2 text-primary"></i>
-                    <a href={user.github} target="_blank" rel="noopener noreferrer">GitHub</a>
-                  </div>
-                )}
-                {user.portfolio && (
-                  <div className="d-flex align-items-center mb-2">
-                    <i className="bi bi-briefcase me-2 text-primary"></i>
-                    <a href={user.portfolio} target="_blank" rel="noopener noreferrer">Portfolio</a>
+                {Array.isArray(headerUser.badges) && headerUser.badges.length > 0 && (
+                  <div className="mt-3 d-flex flex-wrap gap-2">
+                    {headerUser.badges.map((b, i) => (
+                      <span key={i} className="badge rounded-pill text-bg-dark-subtle">{b}</span>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
-          </div>
-        </div>
-        <div className="col-lg-6">
-          <div className="card glossy-card h-100">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h3 className="mb-0">Your Insights</h3>
-                {(!userId || userId === currentUser?._id) && (
-                  <button
-                    className="glossy-button btn-sm"
-                    onClick={() => navigate('/insights/new')}
-                  >
-                    <i className="bi bi-plus-lg me-1"></i> New
+
+            {/* Actions (far right) */}
+            <div className="d-flex flex-wrap gap-2">
+              {isOwner ? (
+                <>
+                  <button className="glossy-button btn btn-sm" onClick={handleEditProfile}>
+                    <i className="bi bi-gear me-2"></i>Edit Profile
                   </button>
-                )}
-              </div>
-              {insights.length === 0 ? (
-                <div className="text-center py-5">
-                  <i className="bi bi-lightbulb text-muted" style={{ fontSize: '3rem' }}></i>
-                  <p className="text-muted mt-3">No insights posted yet.</p>
-                  <button
-                    className="glossy-button mt-2"
-                    onClick={() => navigate('/insights/new')}
-                  >
-                    Create Your First Insight
-                  </button>
-                </div>
+                </>
               ) : (
-                <div className="list-group list-group-flush">
-                  {insights.map((insight) => (
-                    <Insight
-                      key={insight._id}
-                      insight={insight}
-                      onEdit={handleEditInsight}
-                      onDelete={handleDeleteInsight}
-                      isProfile={userId === currentUser?._id}
-                      currentUser={currentUser}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div>
+                    <FollowButton userId={headerUser._id} currentUser={currentUser} />
+                  </div>
+                  <button className="btn btn-sm btn-outline-secondary">
+                    <i className="bi bi-chat-dots me-2"></i>Message
+                  </button>
+                </>
               )}
+              <button className="btn btn-sm btn-outline-secondary" onClick={copyProfileLink}>
+                <i className="bi bi-link-45deg me-2"></i>Copy Link
+              </button>
+              <button className="btn btn-sm btn-outline-secondary" onClick={shareProfile}>
+                <i className="bi bi-share me-2"></i>Share
+              </button>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="row g-2 mt-3">
+            <div className="col-6 col-sm-3">
+              <div
+                className="p-3 rounded-3"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <div className="text-uppercase small text-muted">Followers</div>
+                <div className="fs-5 fw-bold">{followerCount}</div>
+              </div>
+            </div>
+            <div className="col-6 col-sm-3">
+              <div
+                className="p-3 rounded-3"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <div className="text-uppercase small text-muted">Following</div>
+                <div className="fs-5 fw-bold">{followingCount}</div>
+              </div>
+            </div>
+            <div className="col-6 col-sm-3">
+              <div
+                className="p-3 rounded-3"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <div className="text-uppercase small text-muted">Insights</div>
+                <div className="fs-5 fw-bold">{insightsCount}</div>
+              </div>
+            </div>
+            <div className="col-6 col-sm-3">
+              <div
+                className="p-3 rounded-3"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <div className="text-uppercase small text-muted">Skills</div>
+                <div className="fs-5 fw-bold">{headerUser.skills?.length || 0}</div>
+              </div>
             </div>
           </div>
         </div>
-        <div className="col-lg-3">
-          <div className="card glossy-card h-100">
-            <div className="card-body">
-              <h5 className="card-title mb-3">Quick Actions</h5>
-              <div className="d-grid gap-2">
-                <button
-                  className="glossy-button text-start d-flex align-items-center"
-                  onClick={() => navigate('/insights/new')}
-                >
-                  <i className="bi bi-pencil-square me-2"></i>
-                  Create Insight
-                </button>
-                <button
-                  className="glossy-button text-start d-flex align-items-center"
-                  onClick={() => navigate('/bookmarks')}
-                >
-                  <i className="bi bi-bookmark me-2"></i>
-                  Bookmarks
-                </button>
-                <button
-                  className="glossy-button text-start d-flex align-items-center"
-                  onClick={() => navigate('/settings')}
-                >
-                  <i className="bi bi-gear me-2"></i>
-                  Settings
-                </button>
-                <button
-                  className="glossy-button text-start d-flex align-items-center bg-danger hover:bg-danger-dark"
-                  onClick={handleLogout}
-                >
-                  <i className="bi bi-box-arrow-right me-2"></i>
-                  Logout
-                </button>
-              </div>
-              <hr className="my-4" />
-              <h6 className="mb-3">Stats</h6>
-              <div className="d-flex justify-content-between mb-2">
-                <span className="text-muted">Insights</span>
-                <span className="fw-bold">{insights.length}</span>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span className="text-muted">Following</span>
-                <span className="fw-bold">{user.following ? user.following.length : 0}</span>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span className="text-muted">Followers</span>
-                <span className="fw-bold">{user.followers ? user.followers.length : 0}</span>
-              </div>
-              {user.followedTags && user.followedTags.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-muted">Followed Tags: </span>
-                  <span>{user.followedTags.join(', ')}</span>
+
+        {/* Tabs */}
+        <div className="px-3 pb-3">
+          <ul className="nav nav-tabs">
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTab === 'insights' ? 'active' : ''}`}
+                onClick={() => setActiveTab('insights')}
+              >
+                Insights
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTab === 'about' ? 'active' : ''}`}
+                onClick={() => setActiveTab('about')}
+              >
+                About
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTab === 'followers' ? 'active' : ''}`}
+                onClick={() => setActiveTab('followers')}
+              >
+                Followers
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTab === 'following' ? 'active' : ''}`}
+                onClick={() => setActiveTab('following')}
+              >
+                Following
+              </button>
+            </li>
+          </ul>
+
+          <div className="pt-3">
+            {activeTab === 'insights' && (
+              <section>
+                {insightsLoading ? (
+                  <div className="text-center py-5">
+                    <div className="spinner-border text-primary" style={{ width: '3rem', height: '3rem' }} role="status">
+                      <span className="visually-hidden">Loading insights…</span>
+                    </div>
+                    <p className="mt-3">Loading insights…</p>
+                  </div>
+                ) : insights.length === 0 ? (
+                  <div className="text-center py-5">
+                    <i className="bi bi-lightbulb text-muted" style={{ fontSize: '3rem' }}></i>
+                    <h5 className="mt-3 text-muted">No insights yet</h5>
+                    {isOwner && (
+                      <>
+                        <p className="text-muted">Start by creating your first insight!</p>
+                        <Link to="/insights/new" className="glossy-button btn btn-sm">
+                          <i className="bi bi-plus-lg me-2"></i>Create Insight
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="row g-4">
+                    {insights.map((insight) => (
+                      <Insight
+                        key={insight._id}
+                        insight={insight}
+                        currentUser={currentUser}
+                        onEdit={(id) => navigate(`/insights/edit/${id}`)}
+                        onDelete={() => {}}
+                        showRelated={false}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {activeTab === 'about' && (
+              <section className="row g-3">
+                <div className="col-12 col-lg-8">
+                  <div className="card glossy-card">
+                    <div className="card-body">
+                      <h6 className="text-uppercase text-muted mb-2">About</h6>
+                      <p className="mb-0">{headerUser.bio || '—'}</p>
+                    </div>
+                  </div>
+                  <div className="card glossy-card mt-3">
+                    <div className="card-body">
+                      <h6 className="text-uppercase text-muted mb-3">Details</h6>
+                      <div className="row g-3">
+                        <Detail label="Full name" value={headerUser.fullName} icon="person" />
+                        <Detail label="Workplace" value={headerUser.workplace} icon="briefcase" />
+                        <Detail label="Location" value={headerUser.location} icon="geo-alt" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <hr className="my-4" />
-              <h6 className="mb-3">Additional Info</h6>
-              {user.skills && user.skills.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-muted">Skills: </span>
-                  <span>{user.skills.join(', ')}</span>
+
+                <div className="col-12 col-lg-4">
+                  <div className="card glossy-card">
+                    <div className="card-body">
+                      <h6 className="text-uppercase text-muted mb-2">Skills</h6>
+                      <Pills items={headerUser.skills} />
+                    </div>
+                  </div>
+                  <div className="card glossy-card mt-3">
+                    <div className="card-body">
+                      <h6 className="text-uppercase text-muted mb-2">Links</h6>
+                      <ProfileLinks user={headerUser} />
+                    </div>
+                  </div>
                 </div>
-              )}
-              {user.education && user.education.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-muted">Education: </span>
-                  <span>{user.education.join(', ')}</span>
-                </div>
-              )}
-              {user.workExperience && user.workExperience.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-muted">Work Experience: </span>
-                  <span>{user.workExperience.join(', ')}</span>
-                </div>
-              )}
-              {user.languages && user.languages.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-muted">Languages: </span>
-                  <span>{user.languages.join(', ')}</span>
-                </div>
-              )}
-              {user.interests && user.interests.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-muted">Interests: </span>
-                  <span>{user.interests.join(', ')}</span>
-                </div>
-              )}
-              {user.badges && user.badges.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-muted">Badges: </span>
-                  <span>{user.badges.join(', ')}</span>
-                </div>
-              )}
-              {user.availability && (
-                <div className="mb-2">
-                  <span className="text-muted">Availability: </span>
-                  <span>{user.availability}</span>
-                </div>
-              )}
-              {user.preferredTopics && user.preferredTopics.length > 0 && (
-                <div className="mb-2">
-                  <span className="text-muted">Preferred Topics: </span>
-                  <span>{user.preferredTopics.join(', ')}</span>
-                </div>
-              )}
-            </div>
+              </section>
+            )}
+
+            {activeTab === 'followers' && (
+              <UsersGrid
+                title="Followers"
+                loading={loadingFollowers}
+                users={followersExpanded}
+                emptyText="No followers yet."
+                currentUser={currentUser}
+              />
+            )}
+
+            {activeTab === 'following' && (
+              <UsersGrid
+                title="Following"
+                loading={loadingFollowing}
+                users={followingExpanded}
+                emptyText="Not following anyone yet."
+                currentUser={currentUser}
+              />
+            )}
           </div>
         </div>
       </div>
-      {error && (
-        <div className="toast show position-fixed bottom-0 end-0 m-3" role="alert">
-          <div className="toast-header bg-danger text-white">
-            <strong className="me-auto">Error</strong>
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setError('')}
-            ></button>
-          </div>
-          <div className="toast-body">{error}</div>
-        </div>
+
+      {/* Back to Top floating button */}
+      {showTop && (
+        <button
+          className="btn btn-primary position-fixed"
+          style={{ bottom: 20, right: 20, borderRadius: '50%', width: 44, height: 44 }}
+          aria-label="Back to top"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
+          ↑
+        </button>
       )}
     </div>
+  );
+}
+
+function Detail({ label, value, icon = 'dot' }) {
+  return (
+    <div className="col-12 col-md-6">
+      <div className="d-flex align-items-center gap-2">
+        <i className={`bi bi-${icon} text-muted`}></i>
+        <div>
+          <div className="text-muted small">{label}</div>
+          <div className="fw-semibold">{value || '—'}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Pills({ items }) {
+  if (!Array.isArray(items) || items.length === 0) return <div className="text-muted">—</div>;
+  return (
+    <div className="d-flex flex-wrap gap-2">
+      {items.map((s, i) => (
+        <span key={i} className="badge rounded-pill bg-dark text-light border border-1 border-secondary-subtle">
+          {s}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ProfileLinks({ user }) {
+  const links = [
+    { icon: 'link-45deg', label: 'Portfolio', href: user.portfolio },
+    { icon: 'github', label: 'GitHub', href: user.github },
+    { icon: 'linkedin', label: 'LinkedIn', href: user.linkedin },
+    { icon: 'facebook', label: 'Facebook', href: user.facebook },
+  ].filter((l) => !!l.href);
+
+  if (links.length === 0) return <div className="text-muted">—</div>;
+
+  return (
+    <div className="d-grid gap-2">
+      {links.map((l, i) => (
+        <a
+          key={i}
+          href={l.href}
+          target="_blank"
+          rel="noreferrer"
+          className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-between"
+        >
+          <span><i className={`bi bi-${l.icon} me-2`}></i>{l.label}</span>
+          <span className="text-muted">↗</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function UsersGrid({ title, loading, users, emptyText, currentUser }) {
+  return (
+    <section>
+      <h5 className="mb-3">{title}</h5>
+      {loading ? (
+        <div className="text-center py-4">
+          <div className="spinner-border text-primary" role="status" />
+        </div>
+      ) : !Array.isArray(users) || users.length === 0 ? (
+        <div className="text-muted">{emptyText}</div>
+      ) : (
+        <div className="row g-3">
+          {users.map((u) => {
+            const id = u?._id || u?.id || u;
+            const username = u?.username || String(id).slice(0, 6);
+            const placeholderAv = 'https://via.placeholder.com/64';
+            return (
+              <div key={id} className="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div className="card glossy-card h-100 p-3 d-flex">
+                  <div className="d-flex align-items-center gap-2">
+                    <img
+                      src={u?.profilePicture || placeholderAv}
+                      alt={username}
+                      className="rounded-circle"
+                      style={{ width: 40, height: 40, objectFit: 'cover' }}
+                      onError={(e) => (e.currentTarget.src = placeholderAv)}
+                    />
+                    <div className="flex-grow-1">
+                      <div className="fw-semibold">@{username}</div>
+                    </div>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center mt-3">
+                    <Link to={`/profile/${id}`} className="btn btn-sm btn-outline-secondary">Open</Link>
+                    {/* Prevent self-follow button showing for current user */}
+                    {(!currentUser || String(currentUser._id) !== String(id)) && (
+                      <FollowButton userId={id} currentUser={currentUser} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -1,77 +1,79 @@
-Knowsphere/
-├── README.md
-├── package.json
-├── project_documentation.txt
-├── file_list.txt
-├── backend/
-│   ├── .env
-│   ├── knowsphere-drive-key.json
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── resetProfilePictures.js
-│   ├── server.js
-│   ├── config/
-│   │   ├── ai.js
-│   │   ├── db.js
-│   │   └── test-mongo.js
-│   ├── controllers/
-│   │   ├── authController.js
-│   │   ├── commentController.js
-│   │   ├── insightController.js
-│   │   └── newController.js
-│   ├── middleware/
-│   │   ├── aiMiddleware.js
-│   │   └── auth.js
-│   ├── models/
-│   │   ├── Bookmark.js
-│   │   ├── Comment.js
-│   │   ├── Insight.js
-│   │   ├── NewModel.js
-│   │   └── User.js
-│   ├── routes/
-│   │   ├── authroutes.js
-│   │   ├── bookmarkroutes.js
-│   │   ├── comments.js
-│   │   ├── insightroutes.js
-│   │   └── newRoute.js
-│   └── uploads/
-└── frontend/
-    ├── package.json
-    ├── package-lock.json
-    ├── tailwind.config.js
-    ├── public/
-    │   ├── default-insight.png
-    │   ├── favicon.ico
-    │   └── index.html
-    └── src/
-        ├── App.css
-        ├── App.js
-        ├── index.css
-        ├── index.js
-        ├── style.css
-        ├── assets/
-        ├── components/
-        │   ├── BookmarkButton.js
-        │   ├── CommentSection.js
-        │   ├── Common.js
-        │   ├── EditProfile.js
-        │   ├── FollowButton.js
-        │   ├── Footer.js
-        │   ├── ForgotPassword.js
-        │   ├── InsightForm.js
-        │   ├── Login.js
-        │   ├── Navbar.js
-        │   ├── Profile.js
-        │   ├── Settings.js
-        │   ├── Signup.js
-        │   └── VoteButtons.js
-        ├── context/
-        │   ├── AuthContext.js
-        │   └── StateContext.js
-        ├── pages/
-        │   ├── Bookmarks.js
-        │   ├── ExtraPage.js
-        │   └── Home.js
-        └── utils/
-            ├── ai.js
-            └── api.js
+# Knowsphere Project Structure
+
+# Root Directory
+.gitignore
+README.md
+package.json
+project_documentation.txt
+
+# Backend
+backend/
+  server.js
+  operation.js
+  package.json
+  models/
+    Bookmark.js
+    Comment.js
+    Insight.js
+    Log.js
+    Notification.js
+    Report.js
+    User.js
+  routes/
+    adminroutes.js
+    authroutes.js
+    bookmarkroutes.js
+    comments.js
+    insightroutes.js
+    notificationroutes.js
+    reportroutes.js
+  middleware/
+    auth.js
+    aiMiddleware.js
+  config/
+    ai.js
+    test-mongo.js
+  uploads/
+
+# Frontend
+frontend/
+  package.json
+  tailwind.config.js
+  public/
+    default-insight.png
+    favicon.ico
+    index.html
+  src/
+    App.js
+    App.css
+    index.js
+    index.css
+    style.css
+    assets/
+    components/
+      BookmarkButton.js
+      CommentSection.js
+      Common.js
+      EditProfile.js
+      FollowButton.js
+      Footer.js
+      ForgotPassword.js
+      Insight.js
+      InsightForm.js
+      Login.js
+      Navbar.js
+      NotificationBell.js
+      NotificationsPanel.js
+      Profile.js
+      ReportButton.js
+      Settings.js
+      Signup.js
+      TagInsights.js
+      VoteButtons.js
+    pages/
+      AdminDashboard.js
+      Bookmarks.js
+      FollowPage.js
+      Home.js
+    utils/
+      api.js

@@ -11,7 +11,8 @@ import Settings from './components/Settings';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import EditProfile from './components/EditProfile';
-import AdminDashboard from './pages/AdminDashboard';
+import AdminDashboard from './pages/AdminDashboard'; // <-- used below
+import UsersSearch from './pages/UsersSearch';
 import 'react-toastify/dist/ReactToastify.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './style.css';
@@ -90,7 +91,13 @@ function App() {
           <Route path="/login" element={<Login onLogin={handleLogin} />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/edit-profile" element={<EditProfile currentUser={currentUser} />} />
+
+          {/* Admin Dashboard restored so the import is used */}
           <Route path="/admin" element={<AdminDashboard currentUser={currentUser} />} />
+
+          {/* Users search */}
+          <Route path="/users" element={<UsersSearch />} />
+
           <Route
             path="*"
             element={

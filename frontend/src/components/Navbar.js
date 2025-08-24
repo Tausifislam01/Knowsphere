@@ -1,4 +1,3 @@
-// frontend/src/components/Navbar.js
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -7,6 +6,7 @@ import NotificationBell from './NotificationBell';
 function Navbar({ currentUser }) {
   const navigate = useNavigate();
   const isAuthenticated = !!(currentUser && currentUser._id);
+  const isAdmin = !!currentUser?.isAdmin;
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -35,21 +35,28 @@ function Navbar({ currentUser }) {
         <div className="collapse navbar-collapse w-100" id="navbarNav">
           <div className="navbar-nav ms-auto align-items-center gap-2">
             <Link className="nav-link" to="/">Home</Link>
+
             {isAuthenticated ? (
               <>
-                <Link className="nav-link" to={`/profile/${currentUser._id}`}>Profile</Link>
+                {/* Show Profile only for non-admins */}
+                {!isAdmin && (
+                  <Link className="nav-link" to={`/profile/${currentUser._id}`}>Profile</Link>
+                )}
+
                 <Link className="nav-link" to="/bookmarks">Bookmarks</Link>
-                {currentUser.isAdmin && (
+
+                {/* Admin Dashboard for admins */}
+                {isAdmin && (
                   <Link className="nav-link" to="/admin">Admin Dashboard</Link>
                 )}
+
                 <Link className="nav-link" to="/settings">Settings</Link>
+
                 <div className="nav-item d-flex align-items-center">
                   <NotificationBell currentUser={currentUser} />
                 </div>
-                <button
-                  className="nav-link btn btn-link"
-                  onClick={handleLogout}
-                >
+
+                <button className="nav-link btn btn-link" onClick={handleLogout}>
                   Logout
                 </button>
               </>
