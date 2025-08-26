@@ -332,6 +332,7 @@ exports.hideInsight = async (req, res) => {
   try {
     const { id } = req.params;
     const adminId = req.user?.id || req.user?._id?.toString();
+    const reason = (req.body?.reason || '').trim();
 
     const insight = await Insight.findById(id);
     if (!insight) return res.status(404).json({ message: 'Insight not found' });
@@ -342,7 +343,7 @@ exports.hideInsight = async (req, res) => {
     await writeLog({
       adminId,
       action: `insight:${insight.isHidden ? 'hide' : 'unhide'}`,
-      details: { insightId: insight._id.toString() },
+      details: { insightId: insight._id.toString(), reason },
     });
 
     // 🔔 Notify author only when hiding
@@ -350,7 +351,7 @@ exports.hideInsight = async (req, res) => {
       await safeNotify({
         userId: insight.userId,
         type: 'content_hidden',
-        message: 'Your insight was hidden by an administrator.',
+        message: `Your insight was hidden by an administrator.${reason ? ' Reason: ' + reason : ''}`,
         link: `/insights/${insight._id}`,
         createdAt: new Date(),
       });
@@ -368,6 +369,7 @@ exports.deleteInsight = async (req, res) => {
   try {
     const { id } = req.params;
     const adminId = req.user?.id || req.user?._id?.toString();
+    const reason = (req.body?.reason || '').trim();
 
     const insight = await Insight.findById(id);
     if (!insight) return res.status(404).json({ message: 'Insight not found' });
@@ -378,14 +380,14 @@ exports.deleteInsight = async (req, res) => {
     await writeLog({
       adminId,
       action: 'insight:delete',
-      details: { insightId: id.toString() },
+      details: { insightId: id.toString(), reason },
     });
 
     // 🔔 Notify author
     await safeNotify({
       userId: authorId,
       type: 'content_deleted',
-      message: 'Your insight was deleted by an administrator.',
+      message: `Your insight was deleted by an administrator.${reason ? ' Reason: ' + reason : ''}`,
       link: `/insights/${id}`,
       createdAt: new Date(),
     });
@@ -404,6 +406,7 @@ exports.hideComment = async (req, res) => {
   try {
     const { id } = req.params;
     const adminId = req.user?.id || req.user?._id?.toString();
+    const reason = (req.body?.reason || '').trim();
 
     const comment = await Comment.findById(id);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
@@ -417,6 +420,7 @@ exports.hideComment = async (req, res) => {
       details: {
         commentId: comment._id.toString(),
         insightId: comment.insightId?.toString?.() || String(comment.insightId || ''),
+        reason,
       },
     });
 
@@ -425,7 +429,7 @@ exports.hideComment = async (req, res) => {
       await safeNotify({
         userId: comment.userId,
         type: 'content_hidden',
-        message: 'Your comment was hidden by an administrator.',
+        message: `Your comment was hidden by an administrator.${reason ? ' Reason: ' + reason : ''}`,
         link: `/insights/${comment.insightId}?commentId=${comment._id}`,
         createdAt: new Date(),
       });
@@ -448,6 +452,7 @@ exports.deleteComment = async (req, res) => {
   try {
     const { id } = req.params;
     const adminId = req.user?.id || req.user?._id?.toString();
+    const reason = (req.body?.reason || '').trim();
 
     const comment = await Comment.findById(id).lean();
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
@@ -457,14 +462,14 @@ exports.deleteComment = async (req, res) => {
     await writeLog({
       adminId,
       action: 'comment:delete',
-      details: { commentId: id.toString(), insightId: comment.insightId?.toString?.() || String(comment.insightId || '') },
+      details: { commentId: id.toString(), insightId: comment.insightId?.toString?.() || String(comment.insightId || ''), reason },
     });
 
     // 🔔 Notify author
     await safeNotify({
       userId: comment.userId,
       type: 'content_deleted',
-      message: 'Your comment was deleted by an administrator.',
+      message: `Your comment was deleted by an administrator.${reason ? ' Reason: ' + reason : ''}`,
       link: `/insights/${comment.insightId}?commentId=${id}`,
       createdAt: new Date(),
     });

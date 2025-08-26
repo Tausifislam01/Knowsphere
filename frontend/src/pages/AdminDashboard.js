@@ -76,10 +76,8 @@ function AdminDashboard({ currentUser }) {
       };
       updateWidth();
 
-      // Keep in sync with layout changes
       const ro = new ResizeObserver(updateWidth);
       if (bottomRef.current) ro.observe(bottomRef.current);
-      // When window resizes, recompute
       window.addEventListener('resize', updateWidth, { passive: true });
 
       return () => {
@@ -228,9 +226,15 @@ function AdminDashboard({ currentUser }) {
     const actionLabel = isHidden ? 'unhide' : 'hide';
     if (!window.confirm(`Are you sure you want to ${actionLabel} this insight?`)) return;
 
+    // Reason only when HIDING (not when un-hiding)
+    let reason = '';
+    if (!isHidden) {
+      reason = (window.prompt('Short reason to send with the notification (optional):', '') || '').trim();
+    }
+
     try {
       setBusy((b) => ({ ...b, [`ins:${insightId}`]: true }));
-      await hideInsight(insightId);
+      await hideInsight(insightId, reason);
       toast.success(`Insight ${actionLabel}d`, { autoClose: 2000 });
       await refreshActiveTab();
     } catch (e) {
@@ -245,9 +249,11 @@ function AdminDashboard({ currentUser }) {
     if (!ensureAuthOrRedirect()) return;
     if (!window.confirm('Delete this insight permanently?')) return;
 
+    const reason = (window.prompt('Short reason to send with the notification (optional):', '') || '').trim();
+
     try {
       setBusy((b) => ({ ...b, [`ins:${insightId}`]: true }));
-      await deleteInsight(insightId);
+      await deleteInsight(insightId, reason);
       toast.success('Insight deleted', { autoClose: 2000 });
       await refreshActiveTab();
     } catch (e) {
@@ -263,9 +269,15 @@ function AdminDashboard({ currentUser }) {
     const actionLabel = isHidden ? 'unhide' : 'hide';
     if (!window.confirm(`Are you sure you want to ${actionLabel} this comment?`)) return;
 
+    // Reason only when HIDING (not when un-hiding)
+    let reason = '';
+    if (!isHidden) {
+      reason = (window.prompt('Short reason to send with the notification (optional):', '') || '').trim();
+    }
+
     try {
       setBusy((b) => ({ ...b, [`com:${commentId}`]: true }));
-      await hideComment(commentId);
+      await hideComment(commentId, reason);
       toast.success(`Comment ${actionLabel}d`, { autoClose: 2000 });
       await refreshActiveTab();
     } catch (e) {
@@ -280,9 +292,11 @@ function AdminDashboard({ currentUser }) {
     if (!ensureAuthOrRedirect()) return;
     if (!window.confirm('Delete this comment permanently?')) return;
 
+    const reason = (window.prompt('Short reason to send with the notification (optional):', '') || '').trim();
+
     try {
       setBusy((b) => ({ ...b, [`com:${commentId}`]: true }));
-      await deleteComment(commentId);
+      await deleteComment(commentId, reason);
       toast.success('Comment deleted', { autoClose: 2000 });
       await refreshActiveTab();
     } catch (e) {
@@ -369,9 +383,7 @@ function AdminDashboard({ currentUser }) {
     if (!userId || isAdmin) return null;
     return (
       <button
-        className={`btn btn-sm ${
-          isBanned ? 'btn-outline-danger' : 'btn-outline-warning'
-        }`}
+        className={`btn btn-sm ${isBanned ? 'btn-outline-danger' : 'btn-outline-warning'}`}
         onClick={() => openBanModal(userId, isBanned)}
         title="Open ban management"
       >

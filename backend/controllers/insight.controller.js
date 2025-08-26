@@ -1,6 +1,7 @@
 // backend/controllers/insight.controller.js
 const Insight = require('../models/Insight');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 const populateInsight = (q) =>
   q.populate('userId', 'username profilePicture').lean();
@@ -109,19 +110,39 @@ exports.update = async (req, res) => {
 
 /**
  * DELETE /api/insights/:id
+ * Optional body (for admin): { reason?: string }
  */
 exports.remove = async (req, res) => {
   try {
     const { id } = req.params;
+    const reason = (req.body?.reason || '').trim();
+
     const insight = await Insight.findById(id);
     if (!insight) return res.status(404).json({ message: 'Insight not found' });
 
     const isOwner = insight.userId.toString() === req.user.id;
-    if (!isOwner && !req.user.isAdmin) {
+    const isAdmin = !!req.user?.isAdmin;
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
     await Insight.deleteOne({ _id: id });
+
+    // 🔔 If admin deleted, notify the author with optional reason
+    if (isAdmin) {
+      try {
+        await Notification.create({
+          userId: insight.userId,
+          type: 'content_deleted',
+          message: `Your insight was deleted by an administrator.${reason ? ' Reason: ' + reason : ''}`,
+          link: `/insights/${id}`,
+          createdAt: new Date(),
+        });
+      } catch (e) {
+        console.error('notify(insight deleted) error:', e.message);
+      }
+    }
+
     if (req.io) req.io.emit('insightDeleted', { insightId: id });
     return res.json({ message: 'Insight deleted' });
   } catch (e) {
@@ -333,7 +354,8 @@ exports.vote = async (req, res) => {
 
 /**
  * PUT /api/insights/:id/hide
- * Requires admin
+ * Requires admin — toggle hidden state
+ * Optional body: { reason?: string } — send with notification when hiding
  */
 exports.toggleHide = async (req, res) => {
   try {
@@ -343,8 +365,25 @@ exports.toggleHide = async (req, res) => {
     const insight = await Insight.findById(req.params.id);
     if (!insight) return res.status(404).json({ message: 'Insight not found' });
 
+    const reason = (req.body?.reason || '').trim();
+
     insight.isHidden = !insight.isHidden;
     await insight.save();
+
+    // 🔔 notify only when hiding (avoid noise on unhide)
+    if (insight.isHidden) {
+      try {
+        await Notification.create({
+          userId: insight.userId,
+          type: 'content_hidden',
+          message: `Your insight was hidden by an administrator.${reason ? ' Reason: ' + reason : ''}`,
+          link: `/insights/${insight._id}`,
+          createdAt: new Date(),
+        });
+      } catch (e) {
+        console.error('notify(insight hidden) error:', e.message);
+      }
+    }
 
     const populated = await populateInsight(Insight.findById(insight._id));
     if (req.io) req.io.emit('insightHidden', { insightId: insight._id, isHidden: insight.isHidden });

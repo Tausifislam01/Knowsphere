@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const Comment = require('../models/Comment');
 const Insight = require('../models/Insight');
+const Notification = require('../models/Notification');
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(String(id));
 const populateComment = (q) =>
@@ -174,10 +175,13 @@ exports.vote = async (req, res) => {
 /**
  * DELETE /api/comments/:commentId  (also: /api/insights/comments/:commentId)
  * Owner or admin can delete
+ * Optional body: { reason?: string } — used for admin notification
  */
 exports.remove = async (req, res) => {
   try {
     const { commentId } = req.params;
+    const reason = (req.body?.reason || '').trim();
+
     if (!isValidObjectId(commentId)) {
       return res.status(400).json({ message: 'Invalid comment id' });
     }
@@ -186,11 +190,28 @@ exports.remove = async (req, res) => {
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
 
     const isOwner = comment.userId && String(comment.userId) === req.user.id;
-    if (!isOwner && !req.user.isAdmin) {
+    const isAdmin = !!req.user?.isAdmin;
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
     await Comment.deleteOne({ _id: commentId });
+
+    // 🔔 If admin deleted, notify the author with optional reason
+    if (isAdmin) {
+      try {
+        await Notification.create({
+          userId: comment.userId,
+          type: 'content_deleted',
+          message: `Your comment was deleted by an administrator.${reason ? ' Reason: ' + reason : ''}`,
+          link: `/insights/${comment.insightId}?commentId=${commentId}`,
+          createdAt: new Date(),
+        });
+      } catch (e) {
+        console.error('notify(comment deleted) error:', e.message);
+      }
+    }
+
     if (req.io) req.io.emit('commentDeleted', { insightId: comment.insightId, commentId });
     return res.json({ message: 'Comment deleted' });
   } catch (e) {
@@ -202,6 +223,7 @@ exports.remove = async (req, res) => {
 /**
  * PUT /api/comments/:commentId/hide  (also: /api/insights/comments/:commentId/hide)
  * Admin only — toggle hidden state
+ * Optional body: { reason?: string } — for notification when hiding
  */
 exports.toggleHide = async (req, res) => {
   try {
@@ -209,6 +231,8 @@ exports.toggleHide = async (req, res) => {
       return res.status(403).json({ message: 'Admin access required' });
     }
     const { commentId } = req.params;
+    const reason = (req.body?.reason || '').trim();
+
     if (!isValidObjectId(commentId)) {
       return res.status(400).json({ message: 'Invalid comment id' });
     }
@@ -217,6 +241,21 @@ exports.toggleHide = async (req, res) => {
 
     comment.isHidden = !comment.isHidden;
     await comment.save();
+
+    // 🔔 notify only when hiding
+    if (comment.isHidden) {
+      try {
+        await Notification.create({
+          userId: comment.userId,
+          type: 'content_hidden',
+          message: `Your comment was hidden by an administrator.${reason ? ' Reason: ' + reason : ''}`,
+          link: `/insights/${comment.insightId}?commentId=${comment._id}`,
+          createdAt: new Date(),
+        });
+      } catch (e) {
+        console.error('notify(comment hidden) error:', e.message);
+      }
+    }
 
     const populated = await populateComment(Comment.findById(comment._id));
     if (req.io) req.io.emit('commentHidden', { insightId: comment.insightId, commentId, isHidden: comment.isHidden });

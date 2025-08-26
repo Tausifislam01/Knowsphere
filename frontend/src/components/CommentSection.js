@@ -248,11 +248,21 @@ function CommentSection({ insightId, currentUser }) {
     }
     if (!window.confirm('Are you sure you want to delete this comment?')) return;
 
+    // Admin can optionally include a short reason (shown in the notification)
+    const reason =
+      currentUser?.isAdmin
+        ? (window.prompt('Short reason to send with the notification (optional):', '') || '').trim()
+        : '';
+
     setIsLoading(true);
     try {
       const response = await fetch(`${BACKEND_URL}/api/insights/comments/${commentId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason }), // harmless for non-admin; used for admin notifications
       });
       if (!response.ok) {
         const data = await response.json();
@@ -268,16 +278,31 @@ function CommentSection({ insightId, currentUser }) {
     }
   };
 
-  const handleHideComment = async (commentId) => {
+  // Accept current hidden state so we only prompt for reason when we are HIDING
+  const handleHideComment = async (commentId, isCurrentlyHidden) => {
     if (!token) {
       setShowAuthModal(true);
       toast.error('Please log in to hide a comment', { autoClose: 2000 });
       return;
     }
+
+    const actionLabel = isCurrentlyHidden ? 'unhide' : 'hide';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} this comment?`)) return;
+
+    // Reason only when we are hiding (not when un-hiding)
+    const reason =
+      !isCurrentlyHidden && currentUser?.isAdmin
+        ? (window.prompt('Short reason to send with the notification (optional):', '') || '').trim()
+        : '';
+
     try {
       const response = await fetch(`${BACKEND_URL}/api/insights/comments/${commentId}/hide`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
       });
       const data = await response.json();
       if (response.ok) {
@@ -469,13 +494,19 @@ function CommentSection({ insightId, currentUser }) {
                       {currentUser.isAdmin && (
                         <>
                           <li>
-                            <button className="dropdown-item" onClick={() => handleHideComment(comment._id)}>
+                            <button
+                              className="dropdown-item"
+                              onClick={() => handleHideComment(comment._id, !!comment.isHidden)}
+                            >
                               <i className="bi bi-eye-slash me-2"></i>
                               {comment.isHidden ? 'Unhide' : 'Hide'}
                             </button>
                           </li>
                           <li>
-                            <button className="dropdown-item text-danger" onClick={() => handleDeleteComment(comment._id)}>
+                            <button
+                              className="dropdown-item text-danger"
+                              onClick={() => handleDeleteComment(comment._id)}
+                            >
                               <i className="bi bi-trash me-2"></i>Delete
                             </button>
                           </li>
@@ -546,9 +577,6 @@ function CommentSection({ insightId, currentUser }) {
                         >
                           <i className="bi bi-reply me-1"></i>Reply
                         </button>
-                        {/* <button className="btn btn-link text-muted p-0">
-                          <i className="bi bi-heart me-1"></i>Like
-                        </button> */}
                       </div>
 
                       {replyingTo === comment._id && (
