@@ -1,3 +1,4 @@
+// frontend/src/components/ReportButton.js
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { reportContent } from '../utils/api';
@@ -5,20 +6,17 @@ import { reportContent } from '../utils/api';
 const ReportButton = ({ itemId, itemType, currentUser, onClose }) => {
   const [isReporting, setIsReporting] = useState(false);
   const [reason, setReason] = useState('');
-  const [showForm, setShowForm] = useState(true); // Form is always shown when component is rendered
+  const [showForm, setShowForm] = useState(true);
   const [error, setError] = useState('');
 
-  // Prevent rendering if user is the content owner (handled in parent for insights)
-  if (!currentUser) {
-    return null;
-  }
+  if (!currentUser) return null;
 
   const handleReport = async (e) => {
     e.preventDefault();
     if (!currentUser) {
       toast.error('Please log in to report content', { autoClose: 2000 });
       setShowForm(false);
-      onClose();
+      onClose && onClose();
       return;
     }
     if (!reason.trim()) {
@@ -34,11 +32,11 @@ const ReportButton = ({ itemId, itemType, currentUser, onClose }) => {
       setShowForm(false);
       setReason('');
       setError('');
-      onClose();
-    } catch (error) {
-      console.error('Report submission error:', error);
-      setError(`Error submitting report: ${error.message}`);
-      toast.error(`Error submitting report: ${error.message}`, { autoClose: 2000 });
+      onClose && onClose();
+    } catch (err) {
+      console.error('Report submission error:', err);
+      setError(`Error submitting report: ${err.message}`);
+      toast.error(`Error submitting report: ${err.message}`, { autoClose: 2000 });
     } finally {
       setIsReporting(false);
     }
@@ -52,7 +50,7 @@ const ReportButton = ({ itemId, itemType, currentUser, onClose }) => {
       style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
       onClick={() => {
         setShowForm(false);
-        onClose();
+        onClose && onClose();
       }}
     >
       <div
@@ -67,7 +65,7 @@ const ReportButton = ({ itemId, itemType, currentUser, onClose }) => {
             className="btn-close"
             onClick={() => {
               setShowForm(false);
-              onClose();
+              onClose && onClose();
             }}
             aria-label="Close"
           />
@@ -80,9 +78,9 @@ const ReportButton = ({ itemId, itemType, currentUser, onClose }) => {
               value={reason}
               onChange={(e) => {
                 setReason(e.target.value);
-                setError(''); // Clear error on input change
+                setError('');
               }}
-              placeholder="Enter reason for report..."
+              placeholder="Enter reason for report."
               rows="4"
               autoFocus
               required
@@ -96,7 +94,7 @@ const ReportButton = ({ itemId, itemType, currentUser, onClose }) => {
               className="glossy-button bg-secondary me-2"
               onClick={() => {
                 setShowForm(false);
-                onClose();
+                onClose && onClose();
               }}
             >
               Cancel

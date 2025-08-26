@@ -1,65 +1,55 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
-const authRoutes = require('./routes/authroutes');
-const insightsRoutes = require('./routes/insightroutes');
-const bookmarkRoutes = require('./routes/bookmarkroutes');
-const commentsRoutes = require('./routes/comments');
-const reportRoutes = require('./routes/reportroutes');
-const adminRoutes = require('./routes/adminroutes');
-const notificationRoutes = require('./routes/notificationroutes');
-
-dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
   cors: {
     origin: 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true,
   },
 });
 
-// Pass io to routes that need it
-insightsRoutes.setIo(io);
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-// Middleware to attach io to req
+// Attach io to requests so controllers can use req.io
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
 
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
-app.use(express.json());
+// Routes
+const authRoutes = require('./routes/authroutes');
+const insightsRoutes = require('./routes/insightroutes');
+const bookmarkRoutes = require('./routes/bookmarkroutes');
+const reportRoutes = require('./routes/reportroutes');
+const adminRoutes = require('./routes/adminroutes');
+const notificationRoutes = require('./routes/notificationroutes');
+const commentRoutes = require('./routes/comments');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
-app.use('/api/insights', commentsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
-
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-
-  socket.on('disconnect', () => {
-    
-  });
-});
+app.use('/api', commentRoutes); // comments route already has /comments in paths
 
 // MongoDB connection
 mongoose
-  .connect(process.env.MONGO_URI, {})
-  .then(() => console.log('Connected to MongoDB Atlas'))
-  .catch((err) => {
-    console.error('MongoDB connection error:', err);
-    process.exit(1); // Exit process on connection failure
-  });
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log('MongoDB connected'))
+  .catch((err) => console.error('MongoDB connection error:', err));
 
 // Start server
 const PORT = process.env.PORT || 5000;

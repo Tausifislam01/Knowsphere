@@ -597,3 +597,132 @@ button.btn-primary:hover {
   }
 }
 
+/* ===== Comment Section overrides (alignment + hover color) ===== */
+
+/* Keep primary/outline buttons inside comment area from adding random bottom gaps */
+.comment-section .btn-outline-primary,
+.comment-section .btn-outline-secondary,
+.comment-section .btn-primary {
+  margin-bottom: 0 !important;
+}
+
+/* Voting group stays on one line and centers nicely */
+.comment-vote-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;           /* prevent wrapping */
+}
+
+/* Size only the solid/outline buttons, not the link-style */
+.comment-vote-group .btn:not(.btn-link) {
+  min-width: 64px;             /* consistent width so counts align */
+  display: flex;               /* ensure icon+count centered */
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  line-height: 1.2;
+}
+
+/* Reply + See Replies should look like links, with stable color even on hover */
+.comment-section .btn-link,
+.comment-section .comment-action-reply,
+.comment-section .comment-toggle-replies {
+  background: transparent !important;
+  border: none !important;
+  color: var(--link-blue) !important;
+  opacity: 1 !important;       /* defeat any parent opacity confusion */
+  text-decoration: none;
+}
+
+/* On hover/focus, stay visible (no turning white on light bg), just brighten */
+.comment-section .btn-link:hover,
+.comment-section .btn-link:focus,
+.comment-section .comment-action-reply:hover,
+.comment-section .comment-action-reply:focus,
+.comment-section .comment-toggle-replies:hover,
+.comment-section .comment-toggle-replies:focus {
+  color: #7ab0ff !important;
+  text-decoration: underline;
+  opacity: 1 !important;
+}
+
+
+/* ===== Admin Dashboard — visibility, orientation, and dark-friendly styles ===== */
+
+/* 1) Make nav-pills visible like your nav-tabs */
+.nav.nav-pills .nav-link {
+  color: var(--card-text) !important;
+  background: #2a2a2a;                   /* solid (not transparent) */
+  border: 1px solid #2f2f2f;
+  border-radius: .5rem;
+  padding: .5rem .9rem;
+  margin-right: .5rem;
+  margin-bottom: .5rem;                  /* wraps nicely on small screens */
+  transition: filter .15s ease;
+}
+.nav.nav-pills .nav-link:hover { filter: brightness(1.08); }
+.nav.nav-pills .nav-link.active {
+  color: #fff !important;
+  background: var(--link-blue);
+  border-color: var(--link-blue);
+  box-shadow: 0 0 0 .2rem rgba(74,144,226,.22);
+}
+
+/* 2) Header orientation: allow wrap + spacing (affects the common Admin header strip only) */
+.container .d-flex.justify-content-between.align-items-center.mb-3 {
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+
+/* 3) Cards in admin feel “solid” on dark and keep content readable */
+.admin-dashboard .glossy-card,
+.admin-dashboard .admin-card {
+  background-color: var(--card-bg) !important;
+  color: var(--card-text) !important;
+  border: 1px solid #2f2f2f;
+  border-radius: .75rem;
+}
+.admin-dashboard .card-header,
+.admin-dashboard .card-footer {
+  background: #202020 !important;
+  border-color: #2f2f2f !important;
+}
+
+/* 4) Tables: sticky heading that contrasts the dark canvas */
+.admin-dashboard .table thead {
+  position: sticky; top: 0; z-index: 1;
+  background: #222 !important; color: #fff !important;
+  border-bottom: 1px solid #2f2f2f;
+}
+.admin-dashboard .table tbody tr:hover { background: rgba(255,255,255,.03); }
+.admin-dashboard .table .text-truncate { max-width: 28ch; }
+
+/* 5) Buttons tuned for dark bg (no color change to your global palette) */
+.admin-dashboard .btn-outline-warning {
+  color: #f0c36d; border-color: #f0c36d;
+}
+.admin-dashboard .btn-outline-warning:hover {
+  background: rgba(240,195,109,.15); color: #ffd48b;
+}
+.admin-dashboard .btn-outline-secondary {
+  color: #b9b9b9; border-color: #2f2f2f;
+}
+.admin-dashboard .btn-outline-secondary:hover {
+  background: rgba(255,255,255,.06); color: #fff;
+}
+.admin-dashboard .btn-success { background: #3aa76d; border-color: #3aa76d; }
+.admin-dashboard .btn-success:hover { background: #2f8e5b; border-color: #2f8e5b; }
+.admin-dashboard .btn-danger { background: #dc3545; border-color: #dc3545; }
+.admin-dashboard .btn-danger:hover { filter: brightness(1.05); }
+
+/* 6) Links/badges inside dark cards keep the friendly blue */
+.admin-dashboard .card a { color: var(--link-blue); text-decoration: none; }
+.admin-dashboard .card a:hover { text-decoration: underline; }
+.admin-dashboard .badge { border: 1px solid #2f2f2f; }
+
+/* 7) (Nice-to-have) highlight when deep-linking to a comment from Admin */
+.comment--highlight {
+  outline: 2px solid #ffc107;                   /* bootstrap warning color */
+  background: rgba(255,193,7,.12);
+}

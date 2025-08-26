@@ -11,7 +11,7 @@ function Profile({ currentUser }) {
 
   const [headerUser, setHeaderUser] = useState(null);     // profile owner data
   const [insights, setInsights] = useState([]);
-  const [activeTab, setActiveTab] = useState('insights'); // insights | about | followers | following
+  const [activeTab, setActiveTab] = useState('insights'); // insights | about | followers | following | tags
   const [loading, setLoading] = useState(true);
   const [insightsLoading, setInsightsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -195,11 +195,11 @@ function Profile({ currentUser }) {
 
   return (
     <div className="container py-4">
-      {/* Header card: SIDE-BY-SIDE avatar + identity to utilize space */}
+      {/* Header card */}
       <div className="card glossy-card shadow-sm mb-4">
         <div className="card-body">
           <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
-            {/* Avatar (left) */}
+            {/* Avatar + identity */}
             <div className="d-flex align-items-center gap-3">
               <img
                 src={headerUser.profilePicture || placeholderAv}
@@ -208,7 +208,6 @@ function Profile({ currentUser }) {
                 style={{ width: 104, height: 104, objectFit: 'cover' }}
                 onError={(e) => (e.currentTarget.src = placeholderAv)}
               />
-              {/* Identity (right to avatar) */}
               <div>
                 <h1 className="h4 mb-1">{headerUser.fullName || headerUser.username}</h1>
                 <div className="text-muted">@{headerUser.username}</div>
@@ -231,10 +230,13 @@ function Profile({ currentUser }) {
               </div>
             </div>
 
-            {/* Actions (far right) */}
+            {/* Actions */}
             <div className="d-flex flex-wrap gap-2">
               {isOwner ? (
                 <>
+                  <Link to="/insights/new" className="glossy-button btn btn-sm">
+                    <i className="bi bi-plus-lg me-2"></i>Create Insight
+                  </Link>
                   <button className="glossy-button btn btn-sm" onClick={handleEditProfile}>
                     <i className="bi bi-gear me-2"></i>Edit Profile
                   </button>
@@ -244,9 +246,9 @@ function Profile({ currentUser }) {
                   <div>
                     <FollowButton userId={headerUser._id} currentUser={currentUser} />
                   </div>
-                  <button className="btn btn-sm btn-outline-secondary">
+                  {/* <button className="btn btn-sm btn-outline-secondary">
                     <i className="bi bi-chat-dots me-2"></i>Message
-                  </button>
+                  </button> */}
                 </>
               )}
               <button className="btn btn-sm btn-outline-secondary" onClick={copyProfileLink}>
@@ -258,40 +260,28 @@ function Profile({ currentUser }) {
             </div>
           </div>
 
-          {/* Stats row */}
+          {/* Stats */}
           <div className="row g-2 mt-3">
             <div className="col-6 col-sm-3">
-              <div
-                className="p-3 rounded-3"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
+              <div className="p-3 rounded-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="text-uppercase small text-muted">Followers</div>
                 <div className="fs-5 fw-bold">{followerCount}</div>
               </div>
             </div>
             <div className="col-6 col-sm-3">
-              <div
-                className="p-3 rounded-3"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
+              <div className="p-3 rounded-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="text-uppercase small text-muted">Following</div>
                 <div className="fs-5 fw-bold">{followingCount}</div>
               </div>
             </div>
             <div className="col-6 col-sm-3">
-              <div
-                className="p-3 rounded-3"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
+              <div className="p-3 rounded-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="text-uppercase small text-muted">Insights</div>
                 <div className="fs-5 fw-bold">{insightsCount}</div>
               </div>
             </div>
             <div className="col-6 col-sm-3">
-              <div
-                className="p-3 rounded-3"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
+              <div className="p-3 rounded-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="text-uppercase small text-muted">Skills</div>
                 <div className="fs-5 fw-bold">{headerUser.skills?.length || 0}</div>
               </div>
@@ -303,35 +293,28 @@ function Profile({ currentUser }) {
         <div className="px-3 pb-3">
           <ul className="nav nav-tabs">
             <li className="nav-item">
-              <button
-                className={`nav-link ${activeTab === 'insights' ? 'active' : ''}`}
-                onClick={() => setActiveTab('insights')}
-              >
+              <button className={`nav-link ${activeTab === 'insights' ? 'active' : ''}`} onClick={() => setActiveTab('insights')}>
                 Insights
               </button>
             </li>
             <li className="nav-item">
-              <button
-                className={`nav-link ${activeTab === 'about' ? 'active' : ''}`}
-                onClick={() => setActiveTab('about')}
-              >
+              <button className={`nav-link ${activeTab === 'about' ? 'active' : ''}`} onClick={() => setActiveTab('about')}>
                 About
               </button>
             </li>
             <li className="nav-item">
-              <button
-                className={`nav-link ${activeTab === 'followers' ? 'active' : ''}`}
-                onClick={() => setActiveTab('followers')}
-              >
+              <button className={`nav-link ${activeTab === 'followers' ? 'active' : ''}`} onClick={() => setActiveTab('followers')}>
                 Followers
               </button>
             </li>
             <li className="nav-item">
-              <button
-                className={`nav-link ${activeTab === 'following' ? 'active' : ''}`}
-                onClick={() => setActiveTab('following')}
-              >
+              <button className={`nav-link ${activeTab === 'following' ? 'active' : ''}`} onClick={() => setActiveTab('following')}>
                 Following
+              </button>
+            </li>
+            <li className="nav-item">
+              <button className={`nav-link ${activeTab === 'tags' ? 'active' : ''}`} onClick={() => setActiveTab('tags')}>
+                Tags ({(headerUser.followedTags || []).length})
               </button>
             </li>
           </ul>
@@ -433,6 +416,8 @@ function Profile({ currentUser }) {
                 currentUser={currentUser}
               />
             )}
+
+            {activeTab === 'tags' && <TagsPanel tags={headerUser.followedTags || []} />}
           </div>
         </div>
       </div>
@@ -540,7 +525,6 @@ function UsersGrid({ title, loading, users, emptyText, currentUser }) {
                   </div>
                   <div className="d-flex justify-content-between align-items-center mt-3">
                     <Link to={`/profile/${id}`} className="btn btn-sm btn-outline-secondary">Open</Link>
-                    {/* Prevent self-follow button showing for current user */}
                     {(!currentUser || String(currentUser._id) !== String(id)) && (
                       <FollowButton userId={id} currentUser={currentUser} />
                     )}
@@ -552,6 +536,21 @@ function UsersGrid({ title, loading, users, emptyText, currentUser }) {
         </div>
       )}
     </section>
+  );
+}
+
+function TagsPanel({ tags = [] }) {
+  if (!Array.isArray(tags) || tags.length === 0) {
+    return <div className="text-muted">No followed tags</div>;
+  }
+  return (
+    <div className="d-flex flex-wrap gap-2">
+      {tags.map((t) => (
+        <Link key={t} to={`/tags/${encodeURIComponent(t)}`} className="badge bg-secondary text-decoration-none">
+          #{t}
+        </Link>
+      ))}
+    </div>
   );
 }
 

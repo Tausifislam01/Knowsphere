@@ -1,265 +1,366 @@
-const API_URL = 'http://localhost:5000/api';
+// frontend/src/utils/api.js
+const API_ORIGIN = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = `${API_ORIGIN}/api`;
 
-/* ----------------------------------------
-   Helpers
------------------------------------------*/
+/* ---------------- Helpers ---------------- */
 
-// Get auth headers
-const getAuthHeaders = () => ({
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem('token')}`,
-  },
+const authHeader = () => ({
+  Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
 });
 
-// Handle API errors consistently
-const handleApiError = async (response, defaultMessage) => {
-  if (!response.ok) {
-    let errorMessage = defaultMessage;
+const jsonAuthHeaders = () => ({
+  'Content-Type': 'application/json',
+  ...authHeader(),
+});
+
+const handle = async (res, fallback) => {
+  if (!res.ok) {
+    let msg = fallback;
     try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorMessage;
-    } catch {
-      // ignore JSON parse errors; use default message
-    }
-    throw new Error(errorMessage);
+      const j = await res.json();
+      msg = j.message || msg;
+    } catch {}
+    throw new Error(msg);
   }
-  return response.json();
+  return res.json();
 };
 
-/* ----------------------------------------
-   Insights / Search
------------------------------------------*/
+/* -------------- Auth / Profile -------------- */
+
+export const login = async ({ username, password }) => {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  return handle(res, 'Login failed');
+};
+
+export const signup = async ({ username, email, password }) => {
+  const res = await fetch(`${API_URL}/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, email, password }),
+  });
+  return handle(res, 'Signup failed');
+};
+
+export const getProfile = async () => {
+  const res = await fetch(`${API_URL}/auth/profile`, { headers: authHeader() });
+  return handle(res, 'Failed to load profile');
+};
+
+export const updateProfile = async (payloadOrFormData) => {
+  const isForm = payloadOrFormData instanceof FormData;
+  const res = await fetch(`${API_URL}/auth/profile`, {
+    method: 'PUT',
+    headers: isForm ? authHeader() : jsonAuthHeaders(),
+    body: isForm ? payloadOrFormData : JSON.stringify(payloadOrFormData),
+  });
+  return handle(res, 'Failed to update profile');
+};
+
+export const changePassword = async (currentPassword, newPassword) => {
+  const res = await fetch(`${API_URL}/auth/change-password`, {
+    method: 'PUT',
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  return handle(res, 'Failed to change password');
+};
+
+export const deleteProfile = async () => {
+  const res = await fetch(`${API_URL}/auth/delete`, {
+    method: 'DELETE',
+    headers: authHeader(),
+  });
+  return handle(res, 'Failed to delete account');
+};
+
+/* -------------- Users / Follow -------------- */
+
+export const listUsers = async () => {
+  const res = await fetch(`${API_URL}/auth/users`, { headers: authHeader() });
+  return handle(res, 'Failed to load users');
+};
+
+export const searchUsers = async (q, limit = 20, { excludeAdmins = false } = {}) => {
+  const params = new URLSearchParams();
+  if (q && q.trim()) params.set('q', q.trim());
+  params.set('limit', String(limit));
+  if (excludeAdmins) params.set('excludeAdmins', 'true');
+  const res = await fetch(`${API_URL}/auth/users/search?${params.toString()}`, { headers: authHeader() });
+  return handle(res, 'Failed to search users');
+};
+
+export const followUser = async (userId) => {
+  const res = await fetch(`${API_URL}/auth/follow/${userId}`, {
+    method: 'POST',
+    headers: authHeader(),
+  });
+  return handle(res, 'Failed to follow user');
+};
+
+export const unfollowUser = async (userId) => {
+  const res = await fetch(`${API_URL}/auth/unfollow/${userId}`, {
+    method: 'POST',
+    headers: authHeader(),
+  });
+  return handle(res, 'Failed to unfollow user');
+};
+
+export const followTag = async (tag) => {
+  const res = await fetch(`${API_URL}/auth/follow-tag/${encodeURIComponent(tag)}`, {
+    method: 'POST',
+    headers: authHeader(),
+  });
+  return handle(res, 'Failed to follow tag');
+};
+
+export const unfollowTag = async (tag) => {
+  const res = await fetch(`${API_URL}/auth/unfollow-tag/${encodeURIComponent(tag)}`, {
+    method: 'POST',
+    headers: authHeader(),
+  });
+  return handle(res, 'Failed to unfollow tag');
+};
+
+/* ---------------- Insights ---------------- */
 
 export const suggestTags = async (text) => {
-  const response = await fetch(`${API_URL}/insights/suggest-tags`, {
+  const res = await fetch(`${API_URL}/insights/suggest-tags`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders().headers,
-    },
+    headers: jsonAuthHeaders(),
     body: JSON.stringify({ title: '', body: text }),
   });
-  const data = await handleApiError(response, 'Failed to suggest tags');
-  return data.tags.map((tag) => tag.trim());
+  const data = await handle(res, 'Failed to suggest tags');
+  return Array.isArray(data.tags) ? data.tags : [];
 };
 
-export const searchInsights = async (query, tag, followed = false) => {
-  let url = followed ? `${API_URL}/insights/followed` : `${API_URL}/insights/search`;
-  if (query || tag) {
-    url = `${API_URL}/insights/search?${query ? `q=${encodeURIComponent(query)}` : ''}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`;
-  }
-  const response = await fetch(url, getAuthHeaders());
-  return handleApiError(response, 'Failed to fetch insights');
+export const createInsight = async ({ title, body, tags = [], visibility = 'public' }) => {
+  const res = await fetch(`${API_URL}/insights`, {
+    method: 'POST',
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ title, body, tags, visibility }),
+  });
+  return handle(res, 'Failed to create insight');
 };
 
-export const getRelatedInsights = async (insightId, limit = 5) => {
-  const response = await fetch(
-    `${API_URL}/insights/${insightId}/related?limit=${limit}`,
-    getAuthHeaders()
-  );
-  return handleApiError(response, 'Failed to fetch related insights');
+export const updateInsight = async (id, payload) => {
+  const res = await fetch(`${API_URL}/insights/${id}`, {
+    method: 'PUT',
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return handle(res, 'Failed to update insight');
+};
+
+export const deleteInsight = async (id) => {
+  const res = await fetch(`${API_URL}/insights/${id}`, {
+    method: 'DELETE',
+    headers: authHeader(),
+  });
+  return handle(res, 'Failed to delete insight');
+};
+
+export const getPublicInsights = async () => {
+  const res = await fetch(`${API_URL}/insights/public`);
+  return handle(res, 'Failed to load public insights');
+};
+
+export const getFollowedInsights = async () => {
+  const res = await fetch(`${API_URL}/insights/followed`, { headers: authHeader() });
+  return handle(res, 'Failed to load followed insights');
+};
+
+export const searchInsights = async (q = '', tag = '') => {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (tag) params.set('tag', tag);
+  const res = await fetch(`${API_URL}/insights/search?${params.toString()}`);
+  return handle(res, 'Failed to search insights');
 };
 
 export const getTrendingInsights = async (window = '7d', limit = 50, q = '', tag = '') => {
   const params = new URLSearchParams({ window: String(window), limit: String(limit) });
-  if (q && q.trim()) params.set('q', q.trim());
-  if (tag && tag.trim()) params.set('tag', tag.trim());
-  const response = await fetch(
-    `${API_URL}/insights/trending?${params.toString()}`,
-    getAuthHeaders()
-  );
-  return handleApiError(response, 'Failed to fetch trending insights');
+  if (q) params.set('q', q);
+  if (tag) params.set('tag', tag);
+  const res = await fetch(`${API_URL}/insights/trending?${params.toString()}`);
+  return handle(res, 'Failed to load trending insights');
 };
 
-export const translateText = async (text, targetLang) => {
-  const response = await fetch(`${API_URL}/insights/translate`, {
+export const getRelatedInsights = async (id, limit = 5) => {
+  const res = await fetch(`${API_URL}/insights/${id}/related?limit=${limit}`);
+  return handle(res, 'Failed to load related insights');
+};
+
+export const voteInsight = async (id, voteType) => {
+  const res = await fetch(`${API_URL}/insights/${id}/vote`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders().headers,
-    },
-    body: JSON.stringify({ text, targetLang }),
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ voteType }),
   });
-  return handleApiError(response, 'Failed to translate');
+  return handle(res, 'Failed to vote');
 };
 
-/* ----------------------------------------
-   Users
------------------------------------------*/
+/* ---------------- Bookmarks ---------------- */
 
-// UPDATED: search users by username, with options (excludeAdmins, limit)
-export const searchUsers = async (query, limit = 20, opts = {}) => {
-  const params = new URLSearchParams();
-  if (query && query.trim()) params.set('q', query.trim());
-  params.set('limit', String(limit));
-  if (opts.excludeAdmins === true) params.set('excludeAdmins', 'true');
-
-  const response = await fetch(`${API_URL}/auth/users/search?${params.toString()}`, {
-    ...getAuthHeaders()
-  });
-  return handleApiError(response, 'Failed to search users');
+export const getMyBookmarks = async () => {
+  const res = await fetch(`${API_URL}/bookmarks`, { headers: authHeader() });
+  return handle(res, 'Failed to load bookmarks');
 };
 
-/* ----------------------------------------
-   Reports (create / fetch / resolve)
------------------------------------------*/
-
-export const reportContent = async (itemType, itemId, reason) => {
-  const response = await fetch(`${API_URL}/reports`, {
+export const addBookmark = async (insightId) => {
+  const res = await fetch(`${API_URL}/bookmarks`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders().headers,
-    },
-    body: JSON.stringify({
-      reportedItemType: itemType,
-      reportedItemId: itemId,
-      reason,
-    }),
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ insightId }),
   });
-  return handleApiError(response, 'Failed to submit report');
+  return handle(res, 'Failed to add bookmark');
 };
 
-export const fetchReports = async () => {
-  const response = await fetch(`${API_URL}/admin/reports`, getAuthHeaders());
-  return handleApiError(response, 'Failed to fetch reports');
+export const removeBookmark = async (insightId) => {
+  const res = await fetch(`${API_URL}/bookmarks/${insightId}`, {
+    method: 'DELETE',
+    headers: authHeader(),
+  });
+  return handle(res, 'Failed to remove bookmark');
 };
 
-export const resolveReport = async (reportId, status = 'resolved') => {
-  const response = await fetch(`${API_URL}/admin/reports/${reportId}/resolve`, {
+/* ---------------- Reports / Admin ---------------- */
+
+// Create a report for an Insight or Comment
+export const reportContent = async (reportedItemType, reportedItemId, reason) => {
+  const res = await fetch(`${API_URL}/reports`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders().headers,
-    },
-    body: JSON.stringify({ status }),
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ reportedItemType, reportedItemId, reason }),
   });
-  return handleApiError(response, 'Failed to resolve report');
+  return handle(res, 'Failed to submit report');
 };
-
-export const resolveReportWithNote = async (
-  reportId,
-  status = 'resolved',
-  resolutionNote = ''
-) => {
-  const response = await fetch(`${API_URL}/admin/reports/${reportId}/resolve`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders().headers,
-    },
-    body: JSON.stringify({ status, resolutionNote }),
-  });
-  return handleApiError(response, 'Failed to resolve report');
-};
-
-/* ----------------------------------------
-   Admin moderation (insights / comments)
------------------------------------------*/
 
 export const fetchReportedInsights = async () => {
-  const response = await fetch(`${API_URL}/admin/insights/reported`, getAuthHeaders());
-  return handleApiError(response, 'Failed to fetch reported insights');
+  const res = await fetch(`${API_URL}/admin/reports/pending`, { headers: authHeader() });
+  const data = await handle(res, 'Failed to load reported insights');
+  return Array.isArray(data) ? data.filter(r => r?.reportedItemType === 'Insight') : [];
 };
 
 export const fetchReportedComments = async () => {
-  const response = await fetch(`${API_URL}/admin/comments/reported`, getAuthHeaders());
-  return handleApiError(response, 'Failed to fetch reported comments');
+  const res = await fetch(`${API_URL}/admin/reports/pending`, { headers: authHeader() });
+  const data = await handle(res, 'Failed to load reported comments');
+  return Array.isArray(data) ? data.filter(r => r?.reportedItemType === 'Comment') : [];
 };
 
-export const hideInsight = async (insightId) => {
-  const response = await fetch(`${API_URL}/admin/insights/${insightId}/hide`, {
-    method: 'PUT',
-    ...getAuthHeaders(),
+// ✅ send { status, note }
+export const resolveReportWithNote = async (reportId, status = 'resolved', note = '') => {
+  const res = await fetch(`${API_URL}/admin/reports/${reportId}/resolve`, {
+    method: 'POST',
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ status, note }),
   });
-  return handleApiError(response, 'Failed to hide insight');
+  return handle(res, 'Failed to update report');
+};
+
+// Admin-only hide/unhide & deletes
+export const hideInsight = async (id) => {
+  const res = await fetch(`${API_URL}/admin/insights/${id}/hide`, {
+    method: 'PUT',
+    headers: authHeader(),
+  });
+  return handle(res, 'Failed to toggle insight visibility');
 };
 
 export const hideComment = async (commentId) => {
-  const response = await fetch(`${API_URL}/admin/comments/${commentId}/hide`, {
+  const res = await fetch(`${API_URL}/admin/comments/${commentId}/hide`, {
     method: 'PUT',
-    ...getAuthHeaders(),
+    headers: authHeader(),
   });
-  return handleApiError(response, 'Failed to hide comment');
-};
-
-export const deleteInsight = async (insightId) => {
-  const response = await fetch(`${API_URL}/admin/insights/${insightId}`, {
-    method: 'DELETE',
-    ...getAuthHeaders(),
-  });
-  return handleApiError(response, 'Failed to delete insight');
+  return handle(res, 'Failed to toggle comment visibility');
 };
 
 export const deleteComment = async (commentId) => {
-  const response = await fetch(`${API_URL}/admin/comments/${commentId}`, {
+  const res = await fetch(`${API_URL}/admin/comments/${commentId}`, {
     method: 'DELETE',
-    ...getAuthHeaders(),
+    headers: authHeader(),
   });
-  return handleApiError(response, 'Failed to delete comment');
+  return handle(res, 'Failed to delete comment');
 };
 
-/* ----------------------------------------
-   Users (ban / unban)
------------------------------------------*/
-
-export const banUser = async (userId) => {
-  const response = await fetch(`${API_URL}/admin/users/${userId}/ban`, {
+export const banUserAdvanced = async (userId, { durationDays = 7, reason = '', incrementStrike = true } = {}) => {
+  // Compute "until" ISO if durationDays > 0
+  let until = null;
+  if (Number(durationDays) > 0) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + Number(durationDays));
+    until = d.toISOString();
+  }
+  const res = await fetch(`${API_URL}/admin/users/${userId}/ban`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders().headers,
-    },
-    body: JSON.stringify({ durationDays: 0, reason: '', incrementStrike: true }),
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ until, reason, incrementStrike }),
   });
-  return handleApiError(response, 'Failed to ban user');
-};
-
-export const banUserAdvanced = async (
-  userId,
-  { durationDays = 0, reason = '', incrementStrike = true } = {}
-) => {
-  const response = await fetch(`${API_URL}/admin/users/${userId}/ban`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders().headers,
-    },
-    body: JSON.stringify({ durationDays, reason, incrementStrike }),
-  });
-  return handleApiError(response, 'Failed to ban user');
+  return handle(res, 'Failed to ban user');
 };
 
 export const unbanUser = async (userId) => {
-  const response = await fetch(`${API_URL}/admin/users/${userId}/unban`, {
+  const res = await fetch(`${API_URL}/admin/users/${userId}/unban`, {
     method: 'POST',
-    ...getAuthHeaders(),
+    headers: authHeader(),
   });
-  return handleApiError(response, 'Failed to unban user');
+  return handle(res, 'Failed to unban user');
 };
 
-/* ----------------------------------------
-   Notifications (soft-hide clear of READ only)
------------------------------------------*/
+/* ---------------- Notifications ---------------- */
 
 export const getNotifications = async () => {
-  const response = await fetch(`${API_URL}/notifications`, getAuthHeaders());
-  return handleApiError(response, 'Failed to fetch notifications');
+  const res = await fetch(`${API_URL}/notifications`, { headers: authHeader() });
+  return handle(res, 'Failed to load notifications');
 };
 
 export const markNotificationRead = async (id) => {
-  const response = await fetch(`${API_URL}/notifications/${id}/read`, {
+  const res = await fetch(`${API_URL}/notifications/${id}/read`, {
     method: 'POST',
-    ...getAuthHeaders(),
+    headers: authHeader(),
   });
-  return handleApiError(response, 'Failed to mark notification read');
+  return handle(res, 'Failed to mark notification read');
 };
 
-// Clear ONLY READ notifications (backend soft-hides with `archived: true`)
 export const clearReadNotifications = async () => {
-  const response = await fetch(`${API_URL}/notifications/clear-read`, {
+  const res = await fetch(`${API_URL}/notifications/clear-read`, {
     method: 'DELETE',
-    ...getAuthHeaders(),
+    headers: authHeader(),
   });
-  return handleApiError(response, 'Failed to clear read notifications');
+  return handle(res, 'Failed to clear notifications');
+};
+
+/* ---------------- Admin: Handled Reports (NEW) ---------------- */
+
+export const fetchHandledReports = async (params = {}) => {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set('status', params.status);
+  if (params.resolvedBy) qs.set('resolvedBy', params.resolvedBy);
+  if (params.startDate) qs.set('startDate', params.startDate);
+  if (params.endDate) qs.set('endDate', params.endDate);
+  if (params.itemType) qs.set('itemType', params.itemType);
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+
+  const url = `${API_URL}/admin/reports/handled${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await fetch(url, { headers: authHeader() });
+  const data = await handle(res, 'Failed to load handled reports');
+
+  // Be tolerant to both shapes: array OR { items, page, limit, total }
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  return [];
+};
+
+/* ---------------- Admin: Diagnostics (NEW) ---------------- */
+
+export const fetchUserReportCount = async (userId) => {
+  const res = await fetch(`${API_URL}/admin/user-report-count/${userId}`, {
+    headers: authHeader(),
+  });
+  const data = await handle(res, 'Failed to load report count');
+  return typeof data?.count === 'number' ? data.count : 0;
 };

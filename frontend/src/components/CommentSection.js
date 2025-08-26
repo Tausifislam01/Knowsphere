@@ -1,3 +1,4 @@
+// src/components/CommentSection.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
@@ -14,16 +15,20 @@ function CommentSection({ insightId, currentUser }) {
   const [newComment, setNewComment] = useState('');
   const [error, setError] = useState('');
   const [token] = useState(localStorage.getItem('token'));
+
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState('');
+
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editText, setEditText] = useState('');
+
   const [isLoading, setIsLoading] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [displayedComments, setDisplayedComments] = useState(5);
   const [showReplies, setShowReplies] = useState({});
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showReportForm, setShowReportForm] = useState(null);
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -68,6 +73,7 @@ function CommentSection({ insightId, currentUser }) {
 
     const params = new URLSearchParams(location.search);
     const commentId = params.get('commentId');
+
     if (insightId && (showComments || commentId)) {
       setShowComments(true);
       fetchComments();
@@ -92,7 +98,7 @@ function CommentSection({ insightId, currentUser }) {
     socket.on('newComment', (comment) => {
       if (comment.insightId === insightId) {
         setComments((prevComments) => {
-          if (!prevComments.some(c => c._id === comment._id)) {
+          if (!prevComments.some((c) => c._id === comment._id)) {
             return [...prevComments, comment];
           }
           return prevComments;
@@ -104,7 +110,7 @@ function CommentSection({ insightId, currentUser }) {
     socket.on('commentUpdated', (updatedComment) => {
       if (updatedComment.insightId === insightId) {
         setComments((prevComments) =>
-          prevComments.map(c => c._id === updatedComment._id ? updatedComment : c)
+          prevComments.map((c) => (c._id === updatedComment._id ? updatedComment : c)),
         );
       }
     });
@@ -190,9 +196,7 @@ function CommentSection({ insightId, currentUser }) {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
       const updatedComment = await response.json();
-      setComments(comments.map(comment =>
-        comment._id === commentId ? updatedComment : comment
-      ));
+      setComments((prev) => prev.map((c) => (c._id === commentId ? updatedComment : c)));
       setEditingCommentId(null);
       setEditText('');
       setError('');
@@ -223,7 +227,7 @@ function CommentSection({ insightId, currentUser }) {
         const data = await response.json();
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
-      setComments(comments.filter(comment => comment._id !== commentId));
+      setComments((prev) => prev.filter((c) => c._id !== commentId));
       toast.success('Comment deleted successfully', { autoClose: 2000 });
     } catch (error) {
       setError(`Error deleting comment: ${error.message}`);
@@ -246,7 +250,7 @@ function CommentSection({ insightId, currentUser }) {
       });
       const data = await response.json();
       if (response.ok) {
-        setComments(comments.map(c => c._id === commentId ? data : c));
+        setComments((prev) => prev.map((c) => (c._id === commentId ? data : c)));
         toast.success(`Comment ${data.isHidden ? 'hidden' : 'unhidden'} successfully`, { autoClose: 2000 });
       } else {
         toast.error(data.message || 'Failed to update comment', { autoClose: 2000 });
@@ -280,13 +284,8 @@ function CommentSection({ insightId, currentUser }) {
     setReplyingTo(null);
   };
 
-  const handleShowMore = () => {
-    setDisplayedComments((prev) => prev + 5);
-  };
-
-  const handleLoadAll = () => {
-    setDisplayedComments(topLevelComments.length);
-  };
+  const handleShowMore = () => setDisplayedComments((prev) => prev + 5);
+  const handleLoadAll = () => setDisplayedComments(topLevelComments.length);
 
   const handleHideComments = () => {
     setShowComments(false);
@@ -304,9 +303,10 @@ function CommentSection({ insightId, currentUser }) {
       toast.error('Please log in to view replies', { autoClose: 2000 });
       return;
     }
-    setShowReplies(prev => ({ ...prev, [commentId]: !prev[commentId] }));
+    setShowReplies((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
   };
 
+  // Restore: Smooth scroll back to the parent insight card
   const handleScrollToInsight = () => {
     const insightElement = document.getElementById(`insight-${insightId}`);
     if (insightElement) {
@@ -319,22 +319,20 @@ function CommentSection({ insightId, currentUser }) {
 
   const closeDropdown = (commentId) => {
     const dropdownMenu = document.querySelector(`#dropdownMenuButton-${commentId} + .dropdown-menu`);
-    if (dropdownMenu) {
-      dropdownMenu.classList.remove('show');
-    }
+    if (dropdownMenu) dropdownMenu.classList.remove('show');
   };
 
-  const topLevelComments = comments.filter(c => !c.parentCommentId);
+  const topLevelComments = comments.filter((c) => !c.parentCommentId);
 
-  const buildCommentTree = (comments, parentId = null, depth = 0, isTopLevel = false) => {
-    const filteredComments = comments.filter(comment => (comment.parentCommentId || null) === parentId);
-    const displayCount = isTopLevel ? displayedComments : filteredComments.length;
-    return filteredComments.slice(0, displayCount).map(comment => {
-      if (!comment._id || !comment.text || !comment.userId) {
-        return null;
-      }
-      const hasReplies = comments.some(c => c.parentCommentId === comment._id);
-      const replyCount = comments.filter(c => c.parentCommentId === comment._id).length;
+  const buildCommentTree = (allComments, parentId = null, depth = 0, isTopLevel = false) => {
+    const filtered = allComments.filter((c) => (c.parentCommentId || null) === parentId);
+    const displayCount = isTopLevel ? displayedComments : filtered.length;
+
+    return filtered.slice(0, displayCount).map((comment) => {
+      if (!comment._id || !comment.text || !comment.userId) return null;
+
+      const hasReplies = allComments.some((c) => c.parentCommentId === comment._id);
+      const replyCount = allComments.filter((c) => c.parentCommentId === comment._id).length;
       const isHidden = comment.isHidden && !currentUser?.isAdmin;
 
       return (
@@ -363,6 +361,7 @@ function CommentSection({ insightId, currentUser }) {
                     {isHidden && currentUser?.isAdmin && ' • Hidden'}
                   </span>
                 </div>
+
                 {currentUser && (
                   <div className="dropdown">
                     <button
@@ -410,18 +409,13 @@ function CommentSection({ insightId, currentUser }) {
                       {currentUser.isAdmin && (
                         <>
                           <li>
-                            <button
-                              className="dropdown-item"
-                              onClick={() => handleHideComment(comment._id)}
-                            >
-                              <i className="bi bi-eye-slash me-2"></i>{comment.isHidden ? 'Unhide' : 'Hide'}
+                            <button className="dropdown-item" onClick={() => handleHideComment(comment._id)}>
+                              <i className="bi bi-eye-slash me-2"></i>
+                              {comment.isHidden ? 'Unhide' : 'Hide'}
                             </button>
                           </li>
                           <li>
-                            <button
-                              className="dropdown-item text-danger"
-                              onClick={() => handleDeleteComment(comment._id)}
-                            >
+                            <button className="dropdown-item text-danger" onClick={() => handleDeleteComment(comment._id)}>
                               <i className="bi bi-trash me-2"></i>Delete
                             </button>
                           </li>
@@ -431,6 +425,7 @@ function CommentSection({ insightId, currentUser }) {
                   </div>
                 )}
               </div>
+
               {isHidden && !currentUser?.isAdmin ? null : (
                 <>
                   {editingCommentId === comment._id ? (
@@ -456,7 +451,10 @@ function CommentSection({ insightId, currentUser }) {
                     </form>
                   ) : (
                     <>
-                      <p className="mb-2">{isHidden && currentUser?.isAdmin ? `[Hidden Comment] ${comment.text}` : comment.text}</p>
+                      <p className="mb-2">
+                        {isHidden && currentUser?.isAdmin ? `[Hidden Comment] ${comment.text}` : comment.text}
+                      </p>
+
                       <div className="d-flex">
                         <button
                           className="btn btn-link text-muted p-0 me-2"
@@ -468,6 +466,7 @@ function CommentSection({ insightId, currentUser }) {
                           <i className="bi bi-heart me-1"></i>Like
                         </button>
                       </div>
+
                       {replyingTo === comment._id && (
                         <form onSubmit={(e) => handleAddComment(e, comment._id)} className="mt-2">
                           <textarea
@@ -493,15 +492,13 @@ function CommentSection({ insightId, currentUser }) {
                       )}
                     </>
                   )}
+
                   {hasReplies && (
-                    <button
-                      className="btn btn-link text-muted p-0 mt-1"
-                      onClick={() => toggleReplies(comment._id)}
-                    >
+                    <button className="btn btn-link text-muted p-0 mt-1" onClick={() => toggleReplies(comment._id)}>
                       {showReplies[comment._id] ? `Hide Replies (${replyCount})` : `See Replies (${replyCount})`}
                     </button>
                   )}
-                  {showReplies[comment._id] && buildCommentTree(comments, comment._id, depth + 1)}
+                  {showReplies[comment._id] && buildCommentTree(allComments, comment._id, depth + 1)}
                 </>
               )}
             </div>
@@ -521,11 +518,9 @@ function CommentSection({ insightId, currentUser }) {
           onClose={() => setShowReportForm(null)}
         />
       )}
+
       {!showComments ? (
-        <button
-          className="btn btn-outline-primary btn-sm show-comments-btn"
-          onClick={() => setShowComments(true)}
-        >
+        <button className="btn btn-outline-primary btn-sm show-comments-btn" onClick={() => setShowComments(true)}>
           <i className="bi bi-chat-left-text me-1"></i>
           Show Comments
         </button>
@@ -536,14 +531,12 @@ function CommentSection({ insightId, currentUser }) {
               <i className="bi bi-chat-left-text me-1"></i>
               Comments ({topLevelComments.length})
             </h6>
-            <button
-              className="btn btn-outline-secondary btn-sm"
-              onClick={handleHideComments}
-            >
+            <button className="btn btn-outline-secondary btn-sm" onClick={handleHideComments}>
               <i className="bi bi-x-lg me-1"></i>
               Hide Comments
             </button>
           </div>
+
           {isLoading ? (
             <div className="text-center py-2">
               <div className="spinner-border spinner-border-sm text-primary" role="status">
@@ -552,6 +545,7 @@ function CommentSection({ insightId, currentUser }) {
             </div>
           ) : (
             <>
+              {/* New comment box */}
               <div className="mb-3">
                 <textarea
                   className="form-control comment-input"
@@ -574,9 +568,10 @@ function CommentSection({ insightId, currentUser }) {
                   </button>
                 </div>
               </div>
-              {error && (
-                <div className="alert alert-danger py-2">{error}</div>
-              )}
+
+              {error && <div className="alert alert-danger py-2">{error}</div>}
+
+              {/* List */}
               <div className="comments-list">
                 {comments.length === 0 ? (
                   <p className="text-muted">No comments yet.</p>
@@ -584,30 +579,27 @@ function CommentSection({ insightId, currentUser }) {
                   buildCommentTree(comments, null, 0, true)
                 )}
               </div>
+
+              {/* Paging */}
               {topLevelComments.length > displayedComments && (
                 <div className="mt-2 d-flex gap-2">
-                  <button
-                    className="btn btn-outline-primary btn-sm"
-                    onClick={handleShowMore}
-                  >
+                  <button className="btn btn-outline-primary btn-sm" onClick={handleShowMore}>
                     Load More Comments
                   </button>
-                  <button
-                    className="btn btn-outline-primary btn-sm"
-                    onClick={handleLoadAll}
-                  >
+                  <button className="btn btn-outline-primary btn-sm" onClick={handleLoadAll}>
                     Load All Comments
                   </button>
                 </div>
               )}
-              <button
-                className="btn btn-secondary btn-sm mt-3"
-                onClick={handleScrollToInsight}
-              >
+
+              {/* Restored Back-to-Insight scroll button */}
+              <button className="btn btn-secondary btn-sm mt-3" onClick={handleScrollToInsight}>
                 Back to Insight
               </button>
             </>
           )}
+
+          {/* Auth required modal */}
           <div
             className={`modal fade ${showAuthModal ? 'show d-block' : ''}`}
             tabIndex="-1"
@@ -617,28 +609,16 @@ function CommentSection({ insightId, currentUser }) {
               <div className="modal-content">
                 <div className="modal-header">
                   <h5 className="modal-title">Authentication Required</h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={() => setShowAuthModal(false)}
-                  ></button>
+                  <button type="button" className="btn-close" onClick={() => setShowAuthModal(false)} />
                 </div>
                 <div className="modal-body">
                   <p>Please log in or sign up to view or post comments.</p>
                 </div>
                 <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => navigate('/login')}
-                  >
+                  <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
                     Log In
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary"
-                    onClick={() => navigate('/signup')}
-                  >
+                  <button type="button" className="btn btn-outline-primary" onClick={() => navigate('/signup')}>
                     Sign Up
                   </button>
                 </div>

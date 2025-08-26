@@ -89,7 +89,7 @@ function Insight({ insight, currentUser, onEdit, onDelete, showRelated = true })
       socket.off('insightVoted');
       socket.off('insightCreated');
       socket.off('insightUpdated');
-      socket.off('insightDeleted');
+      socket.off('insightHidden');
     };
   }, [insight, showRelated]);
 
