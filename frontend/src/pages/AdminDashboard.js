@@ -1,5 +1,5 @@
 // frontend/src/pages/AdminDashboard.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
@@ -56,6 +56,61 @@ function AdminDashboard({ currentUser }) {
       return false;
     }
     return true;
+  };
+
+  /* ───────────────── Floating (top) horizontal scrollbar ───────────────── */
+  const HScroll = ({ children }) => {
+    const topRef = useRef(null);
+    const bottomRef = useRef(null);
+    const spacerRef = useRef(null);
+
+    const sync = (from, to) => {
+      if (!from || !to) return;
+      if (to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+    };
+
+    useEffect(() => {
+      const updateWidth = () => {
+        const w = bottomRef.current?.scrollWidth || 0;
+        if (spacerRef.current) spacerRef.current.style.width = `${w}px`;
+      };
+      updateWidth();
+
+      // Keep in sync with layout changes
+      const ro = new ResizeObserver(updateWidth);
+      if (bottomRef.current) ro.observe(bottomRef.current);
+      // When window resizes, recompute
+      window.addEventListener('resize', updateWidth, { passive: true });
+
+      return () => {
+        ro.disconnect();
+        window.removeEventListener('resize', updateWidth);
+      };
+    }, []);
+
+    return (
+      <div className="hscroll">
+        {/* top floating scrollbar (sticky within the card) */}
+        <div
+          className="hscroll-top"
+          ref={topRef}
+          onScroll={() => sync(topRef.current, bottomRef.current)}
+          role="presentation"
+          aria-hidden="true"
+        >
+          <div ref={spacerRef} style={{ height: 1 }} />
+        </div>
+
+        {/* main table scroller (normal) */}
+        <div
+          className="table-responsive"
+          ref={bottomRef}
+          onScroll={() => sync(bottomRef.current, topRef.current)}
+        >
+          {children}
+        </div>
+      </div>
+    );
   };
 
   /** ----------------- Resolve / Dismiss ----------------- */
@@ -303,33 +358,6 @@ function AdminDashboard({ currentUser }) {
     <div className="d-flex flex-wrap gap-2">{children}</div>
   );
 
-  const CommentCell = ({ report }) => {
-    const text =
-      report?.reportedItemId?.text ??
-      report?.contentSnapshot?.text ??
-      '(deleted)';
-    const insightId =
-      report?.reportedItemId?.insightId ??
-      report?.contentSnapshot?.insightId;
-    const commentId = report?.reportedItemId?._id;
-
-    return (
-      <div>
-        <div className="text-truncate" style={{ maxWidth: 320 }} title={text}>
-          {text}
-        </div>
-        {insightId && (
-          <Link
-            to={`/insights/${insightId}${commentId ? `#comment-${commentId}` : ''}`}
-            className="small text-decoration-none"
-          >
-            View in context
-          </Link>
-        )}
-      </div>
-    );
-  };
-
   const EmptyState = ({ message }) => (
     <div className="text-center py-5">
       <i className="bi bi-inboxes text-muted" style={{ fontSize: '3rem' }} />
@@ -353,26 +381,7 @@ function AdminDashboard({ currentUser }) {
   };
 
   return (
-    <div className="container py-4">
-      {/* Local styles: restore solid backgrounds & visible active tabs */}
-      <style>{`
-        .admin-card {
-          background-color: var(--bs-body-bg);
-          border: 1px solid var(--bs-border-color);
-          border-radius: .75rem;
-        }
-        .admin-tabs.nav-pills .nav-link {
-          border: 1px solid var(--bs-border-color);
-          margin-right: .5rem;
-          border-radius: .5rem;
-        }
-        .admin-tabs.nav-pills .nav-link.active {
-          color: #fff;
-          background-color: var(--bs-primary);
-          border-color: var(--bs-primary);
-        }
-      `}</style>
-
+    <div className="container admin-dashboard py-4">
       {!currentUser?.isAdmin ? (
         <div className="alert alert-danger d-flex align-items-center">
           <i className="bi bi-exclamation-triangle-fill me-2"></i>
@@ -431,7 +440,7 @@ function AdminDashboard({ currentUser }) {
                 <div>
                   {/* ----------------- Insights Tab ----------------- */}
                   {activeTab === 'insights' && (
-                    <div className="table-responsive">
+                    <HScroll>
                       {reportedInsights.length === 0 ? (
                         <EmptyState message="No reported insights to display" />
                       ) : (
@@ -469,11 +478,7 @@ function AdminDashboard({ currentUser }) {
                                   </td>
                                   <td className="text-truncate" style={{ maxWidth: 280 }}>
                                     <Link
-                                      to={
-                                        insightId
-                                          ? `/insights/${insightId}`
-                                          : '#'
-                                      }
+                                      to={insightId ? `/insights/${insightId}` : '#'}
                                       className="text-decoration-none"
                                       title={
                                         report?.reportedItemId?.title ||
@@ -488,10 +493,7 @@ function AdminDashboard({ currentUser }) {
                                   </td>
                                   <td>
                                     {authorId ? (
-                                      <Link
-                                        to={`/profile/${authorId}`}
-                                        className="text-decoration-none"
-                                      >
+                                      <Link to={`/profile/${authorId}`} className="text-decoration-none">
                                         {authorName}
                                       </Link>
                                     ) : (
@@ -507,10 +509,7 @@ function AdminDashboard({ currentUser }) {
                                   </td>
                                   <td>
                                     {report.reporterId?._id ? (
-                                      <Link
-                                        to={`/profile/${report.reporterId._id}`}
-                                        className="text-decoration-none"
-                                      >
+                                      <Link to={`/profile/${report.reporterId._id}`} className="text-decoration-none">
                                         {report.reporterId?.username || 'Unknown'}
                                       </Link>
                                     ) : (
@@ -533,9 +532,7 @@ function AdminDashboard({ currentUser }) {
                                       </button>
                                       <button
                                         className="btn btn-sm btn-success"
-                                        onClick={() =>
-                                          openResolveModal(report._id, 'resolved')
-                                        }
+                                        onClick={() => openResolveModal(report._id, 'resolved')}
                                         title="Resolve with note"
                                       >
                                         Resolve…
@@ -550,14 +547,8 @@ function AdminDashboard({ currentUser }) {
                                                 report?.reportedItemId?.isHidden
                                               )
                                             }
-                                            disabled={
-                                              !!busy[`ins:${report.reportedItemId._id}`]
-                                            }
-                                            title={
-                                              report?.reportedItemId?.isHidden
-                                                ? 'Unhide insight'
-                                                : 'Hide insight'
-                                            }
+                                            disabled={!!busy[`ins:${report.reportedItemId._id}`]}
+                                            title={report?.reportedItemId?.isHidden ? 'Unhide insight' : 'Hide insight'}
                                           >
                                             {report?.reportedItemId?.isHidden ? 'Unhide' : 'Hide'}
                                           </button>
@@ -571,11 +562,7 @@ function AdminDashboard({ currentUser }) {
                                           </button>
                                         </>
                                       )}
-                                      <BanButton
-                                        userId={authorId}
-                                        isAdmin={isAdmin}
-                                        isBanned={isBanned}
-                                      />
+                                      <BanButton userId={authorId} isAdmin={isAdmin} isBanned={isBanned} />
                                     </ActionButtons>
                                   </td>
                                 </tr>
@@ -584,12 +571,12 @@ function AdminDashboard({ currentUser }) {
                           </tbody>
                         </table>
                       )}
-                    </div>
+                    </HScroll>
                   )}
 
                   {/* ----------------- Comments Tab ----------------- */}
                   {activeTab === 'comments' && (
-                    <div className="table-responsive">
+                    <HScroll>
                       {reportedComments.length === 0 ? (
                         <EmptyState message="No reported comments to display" />
                       ) : (
@@ -619,15 +606,40 @@ function AdminDashboard({ currentUser }) {
                               const isBanned =
                                 report?.reportedItemId?.userId?.isBanned;
                               const commentId = report?.reportedItemId?._id;
-                              const isHidden =
-                                report?.reportedItemId?.isHidden ?? false;
+                              const isHidden = report?.reportedItemId?.isHidden ?? false;
 
                               return (
                                 <tr key={report._id || Math.random()}>
-                                  <td className="text-monospace small">
-                                    {commentId ?? 'N/A'}
+                                  <td className="text-monospace small">{commentId ?? 'N/A'}</td>
+                                  <td>
+                                    <div>
+                                      <div
+                                        className="text-truncate"
+                                        style={{ maxWidth: 320 }}
+                                        title={
+                                          report?.reportedItemId?.text ??
+                                          report?.contentSnapshot?.text ??
+                                          '(deleted)'
+                                        }
+                                      >
+                                        {report?.reportedItemId?.text ??
+                                          report?.contentSnapshot?.text ??
+                                          '(deleted)'}
+                                      </div>
+                                      {(report?.reportedItemId?.insightId ||
+                                        report?.contentSnapshot?.insightId) && (
+                                        <Link
+                                          to={`/insights/${
+                                            report?.reportedItemId?.insightId ||
+                                            report?.contentSnapshot?.insightId
+                                          }${commentId ? `#comment-${commentId}` : ''}`}
+                                          className="small text-decoration-none"
+                                        >
+                                          View in context
+                                        </Link>
+                                      )}
+                                    </div>
                                   </td>
-                                  <td><CommentCell report={report} /></td>
                                   <td>{authorName}</td>
                                   <td
                                     className="text-truncate"
@@ -658,31 +670,20 @@ function AdminDashboard({ currentUser }) {
                                       <button
                                         className="btn btn-sm btn-outline-secondary"
                                         onClick={() => dismissReport(report._id)}
-                                        title="Dismiss report"
                                       >
                                         Dismiss
                                       </button>
                                       <button
                                         className="btn btn-sm btn-success"
-                                        onClick={() =>
-                                          openResolveModal(report._id, 'resolved')
-                                        }
-                                        title="Resolve with note"
+                                        onClick={() => openResolveModal(report._id, 'resolved')}
                                       >
                                         Resolve…
                                       </button>
                                       {commentId && (
                                         <button
                                           className="btn btn-sm btn-outline-warning"
-                                          onClick={() =>
-                                            clickHideComment(commentId, isHidden)
-                                          }
-                                          disabled={
-                                            !!busy[`com:${report.reportedItemId._id}`]
-                                          }
-                                          title={
-                                            isHidden ? 'Unhide comment' : 'Hide comment'
-                                          }
+                                          onClick={() => clickHideComment(commentId, isHidden)}
+                                          disabled={!!busy[`com:${report.reportedItemId._id}`]}
                                         >
                                           {isHidden ? 'Unhide' : 'Hide'}
                                         </button>
@@ -694,15 +695,10 @@ function AdminDashboard({ currentUser }) {
                                           clickDeleteComment(report.reportedItemId._id)
                                         }
                                         disabled={!report?.reportedItemId?._id}
-                                        title="Delete comment"
                                       >
                                         Delete
                                       </button>
-                                      <BanButton
-                                        userId={authorId}
-                                        isAdmin={isAdmin}
-                                        isBanned={isBanned}
-                                      />
+                                      <BanButton userId={authorId} isAdmin={isAdmin} isBanned={isBanned} />
                                     </ActionButtons>
                                   </td>
                                 </tr>
@@ -711,7 +707,7 @@ function AdminDashboard({ currentUser }) {
                           </tbody>
                         </table>
                       )}
-                    </div>
+                    </HScroll>
                   )}
 
                   {/* ----------------- Handled Tab ----------------- */}
@@ -723,9 +719,7 @@ function AdminDashboard({ currentUser }) {
                           <select
                             className="form-select form-select-sm"
                             value={reportSearch.status}
-                            onChange={(e) =>
-                              setReportSearch({ ...reportSearch, status: e.target.value })
-                            }
+                            onChange={(e) => setReportSearch({ ...reportSearch, status: e.target.value })}
                           >
                             <option value="">Any</option>
                             <option value="resolved">Resolved</option>
@@ -739,9 +733,7 @@ function AdminDashboard({ currentUser }) {
                             className="form-control form-control-sm"
                             placeholder="642e… (optional)"
                             value={reportSearch.resolvedBy}
-                            onChange={(e) =>
-                              setReportSearch({ ...reportSearch, resolvedBy: e.target.value })
-                            }
+                            onChange={(e) => setReportSearch({ ...reportSearch, resolvedBy: e.target.value })}
                           />
                         </div>
                         <div className="col-md-2">
@@ -750,9 +742,7 @@ function AdminDashboard({ currentUser }) {
                             type="date"
                             className="form-control form-control-sm"
                             value={reportSearch.startDate}
-                            onChange={(e) =>
-                              setReportSearch({ ...reportSearch, startDate: e.target.value })
-                            }
+                            onChange={(e) => setReportSearch({ ...reportSearch, startDate: e.target.value })}
                           />
                         </div>
                         <div className="col-md-2">
@@ -761,9 +751,7 @@ function AdminDashboard({ currentUser }) {
                             type="date"
                             className="form-control form-control-sm"
                             value={reportSearch.endDate}
-                            onChange={(e) =>
-                              setReportSearch({ ...reportSearch, endDate: e.target.value })
-                            }
+                            onChange={(e) => setReportSearch({ ...reportSearch, endDate: e.target.value })}
                           />
                         </div>
                         <div className="col-md-2">
@@ -771,9 +759,7 @@ function AdminDashboard({ currentUser }) {
                           <select
                             className="form-select form-select-sm"
                             value={reportSearch.itemType}
-                            onChange={(e) =>
-                              setReportSearch({ ...reportSearch, itemType: e.target.value })
-                            }
+                            onChange={(e) => setReportSearch({ ...reportSearch, itemType: e.target.value })}
                           >
                             <option value="">Any</option>
                             <option value="Insight">Insight</option>
@@ -782,7 +768,7 @@ function AdminDashboard({ currentUser }) {
                         </div>
                       </div>
 
-                      <div className="table-responsive">
+                      <HScroll>
                         {handledReports.length === 0 ? (
                           <EmptyState message="No handled reports match your filters" />
                         ) : (
@@ -842,52 +828,28 @@ function AdminDashboard({ currentUser }) {
                                     <td>{report.reportedItemType}</td>
                                     <td>
                                       <Link to={linkHref} className="text-decoration-none">
-                                        {typeof contentPreview === 'string' &&
-                                        contentPreview.length > 64
+                                        {typeof contentPreview === 'string' && contentPreview.length > 64
                                           ? `${contentPreview.slice(0, 64)}…`
                                           : contentPreview}
                                       </Link>
-                                      {!exists && (
-                                        <span className="badge bg-secondary ms-2">
-                                          deleted
-                                        </span>
-                                      )}
+                                      {!exists && <span className="badge bg-secondary ms-2">deleted</span>}
                                     </td>
-                                    <td
-                                      className="text-truncate"
-                                      style={{ maxWidth: 260 }}
-                                      title={report.reason}
-                                    >
+                                    <td className="text-truncate" style={{ maxWidth: 260 }} title={report.reason}>
                                       {report.reason}
                                     </td>
                                     <td>
-                                      <span
-                                        className={`badge ${
-                                          report.status === 'resolved'
-                                            ? 'bg-success'
-                                            : 'bg-secondary'
-                                        }`}
-                                      >
+                                      <span className={`badge ${report.status === 'resolved' ? 'bg-success' : 'bg-secondary'}`}>
                                         {report.status}
                                       </span>
                                     </td>
                                     <td>
                                       {report.resolvedBy?._id ? (
-                                        <Link
-                                          to={`/profile/${report.resolvedBy._id}`}
-                                          className="text-decoration-none"
-                                        >
+                                        <Link to={`/profile/${report.resolvedBy._id}`} className="text-decoration-none">
                                           {report.resolvedBy?.username || 'Unknown'}
                                         </Link>
-                                      ) : (
-                                        'Unknown'
-                                      )}
+                                      ) : ('Unknown')}
                                     </td>
-                                    <td>
-                                      {report.resolvedAt
-                                        ? new Date(report.resolvedAt).toLocaleString()
-                                        : '—'}
-                                    </td>
+                                    <td>{report.resolvedAt ? new Date(report.resolvedAt).toLocaleString() : '—'}</td>
                                     <td>
                                       <span className="badge bg-secondary-subtle text-dark border">
                                         {report.userReportCount || 0}
@@ -895,18 +857,10 @@ function AdminDashboard({ currentUser }) {
                                     </td>
                                     <td>
                                       <ActionButtons>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary"
-                                          onClick={() => dismissReport(report._id)}
-                                        >
+                                        <button className="btn btn-sm btn-outline-secondary" onClick={() => dismissReport(report._id)}>
                                           Re-open / Dismiss Again
                                         </button>
-                                        <button
-                                          className="btn btn-sm btn-success"
-                                          onClick={() =>
-                                            openResolveModal(report._id, 'resolved')
-                                          }
-                                        >
+                                        <button className="btn btn-sm btn-success" onClick={() => openResolveModal(report._id, 'resolved')}>
                                           Re-resolve…
                                         </button>
                                         {authorId && (
@@ -924,7 +878,7 @@ function AdminDashboard({ currentUser }) {
                             </tbody>
                           </table>
                         )}
-                      </div>
+                      </HScroll>
                     </div>
                   )}
                 </div>
@@ -946,11 +900,7 @@ function AdminDashboard({ currentUser }) {
                 })
               }
             >
-              <div
-                className="card admin-card p-3"
-                onClick={(e) => e.stopPropagation()}
-                style={{ minWidth: 420 }}
-              >
+              <div className="card admin-card p-3" onClick={(e) => e.stopPropagation()} style={{ minWidth: 420 }}>
                 <div className="card-body">
                   <h5 className="card-title">Resolve Report</h5>
                   <div className="mb-3">
@@ -958,9 +908,7 @@ function AdminDashboard({ currentUser }) {
                     <select
                       className="form-select"
                       value={resolveModal.status}
-                      onChange={(e) =>
-                        setResolveModal({ ...resolveModal, status: e.target.value })
-                      }
+                      onChange={(e) => setResolveModal({ ...resolveModal, status: e.target.value })}
                     >
                       <option value="resolved">Resolved</option>
                       <option value="dismissed">Dismissed</option>
@@ -972,12 +920,7 @@ function AdminDashboard({ currentUser }) {
                       className="form-control"
                       rows={3}
                       value={resolveModal.resolutionNote}
-                      onChange={(e) =>
-                        setResolveModal({
-                          ...resolveModal,
-                          resolutionNote: e.target.value
-                        })
-                      }
+                      onChange={(e) => setResolveModal({ ...resolveModal, resolutionNote: e.target.value })}
                       placeholder="Explain your decision for audit trail and reporter notice"
                     />
                   </div>
@@ -1020,11 +963,7 @@ function AdminDashboard({ currentUser }) {
                 })
               }
             >
-              <div
-                className="card admin-card p-3"
-                onClick={(e) => e.stopPropagation()}
-                style={{ minWidth: 420 }}
-              >
+              <div className="card admin-card p-3" onClick={(e) => e.stopPropagation()} style={{ minWidth: 420 }}>
                 <div className="card-body">
                   <h5 className="card-title">Manage Ban</h5>
                   <div className="mb-3">
@@ -1032,9 +971,7 @@ function AdminDashboard({ currentUser }) {
                     <select
                       className="form-select"
                       value={banModal.durationDays}
-                      onChange={(e) =>
-                        setBanModal({ ...banModal, durationDays: e.target.value })
-                      }
+                      onChange={(e) => setBanModal({ ...banModal, durationDays: e.target.value })}
                     >
                       <option value={1}>1 day</option>
                       <option value={3}>3 days</option>
@@ -1049,9 +986,7 @@ function AdminDashboard({ currentUser }) {
                       className="form-control"
                       rows={3}
                       value={banModal.reason}
-                      onChange={(e) =>
-                        setBanModal({ ...banModal, reason: e.target.value })
-                      }
+                      onChange={(e) => setBanModal({ ...banModal, reason: e.target.value })}
                       placeholder="This reason will be sent in the notification"
                     />
                   </div>
@@ -1060,12 +995,7 @@ function AdminDashboard({ currentUser }) {
                       className="form-check-input"
                       type="checkbox"
                       checked={banModal.incrementStrike}
-                      onChange={(e) =>
-                        setBanModal({
-                          ...banModal,
-                          incrementStrike: e.target.checked
-                        })
-                      }
+                      onChange={(e) => setBanModal({ ...banModal, incrementStrike: e.target.checked })}
                       id="banStrikeCheck"
                     />
                     <label className="form-check-label" htmlFor="banStrikeCheck">

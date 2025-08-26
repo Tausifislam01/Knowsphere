@@ -82,6 +82,7 @@ function CommentSection({ insightId, currentUser }) {
       setError('Please log in to view comments');
     }
 
+    // Deep-link: scroll & temporary highlight
     if (commentId && showComments) {
       setTimeout(() => {
         const commentElement = document.getElementById(`comment-${commentId}`);
@@ -95,6 +96,7 @@ function CommentSection({ insightId, currentUser }) {
       }, 500);
     }
 
+    // Existing events (keep)
     socket.on('newComment', (comment) => {
       if (comment.insightId === insightId) {
         setComments((prevComments) => {
@@ -115,9 +117,38 @@ function CommentSection({ insightId, currentUser }) {
       }
     });
 
+    // New listeners (add-only): refetch or minimally update to stay in sync
+    socket.on('commentCreated', ({ insightId: evInsightId }) => {
+      if (evInsightId === insightId) {
+        fetchComments();
+      }
+    });
+
+    socket.on('commentDeleted', ({ insightId: evInsightId, commentId: deletedId }) => {
+      if (evInsightId === insightId) {
+        setComments((prev) => prev.filter((c) => c._id !== deletedId));
+      }
+    });
+
+    socket.on('commentHidden', ({ insightId: evInsightId, commentId: hidId, isHidden }) => {
+      if (evInsightId === insightId) {
+        setComments((prev) => prev.map((c) => (c._id === hidId ? { ...c, isHidden } : c)));
+      }
+    });
+
+    socket.on('commentVoted', ({ insightId: evInsightId }) => {
+      if (evInsightId === insightId) {
+        fetchComments();
+      }
+    });
+
     return () => {
       socket.off('newComment');
       socket.off('commentUpdated');
+      socket.off('commentCreated');
+      socket.off('commentDeleted');
+      socket.off('commentHidden');
+      socket.off('commentVoted');
     };
   }, [insightId, showComments, token, location.search]);
 
@@ -306,7 +337,7 @@ function CommentSection({ insightId, currentUser }) {
     setShowReplies((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
   };
 
-  // Restore: Smooth scroll back to the parent insight card
+  // Smooth scroll back to the parent insight card
   const handleScrollToInsight = () => {
     const insightElement = document.getElementById(`insight-${insightId}`);
     if (insightElement) {
@@ -320,6 +351,35 @@ function CommentSection({ insightId, currentUser }) {
   const closeDropdown = (commentId) => {
     const dropdownMenu = document.querySelector(`#dropdownMenuButton-${commentId} + .dropdown-menu`);
     if (dropdownMenu) dropdownMenu.classList.remove('show');
+  };
+
+  // ---------- Voting helpers ----------
+  const userHasUpvoted = (c) =>
+    Array.isArray(c.upvotes) && currentUser?._id && c.upvotes.some((u) => String(u) === String(currentUser._id));
+  const userHasDownvoted = (c) =>
+    Array.isArray(c.downvotes) && currentUser?._id && c.downvotes.some((u) => String(u) === String(currentUser._id));
+
+  const handleVote = async (commentId, voteType /* 'upvote' | 'downvote' */) => {
+    if (!token) {
+      setShowAuthModal(true);
+      toast.error('Please log in to vote on comments', { autoClose: 2000 });
+      return;
+    }
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/insights/comments/${commentId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ voteType }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to vote');
+      }
+      const updated = await res.json();
+      setComments((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
+    } catch (e) {
+      toast.error(e.message, { autoClose: 2000 });
+    }
   };
 
   const topLevelComments = comments.filter((c) => !c.parentCommentId);
@@ -455,6 +515,30 @@ function CommentSection({ insightId, currentUser }) {
                         {isHidden && currentUser?.isAdmin ? `[Hidden Comment] ${comment.text}` : comment.text}
                       </p>
 
+                      {/* Comment vote buttons (add-only) */}
+                      <div className="comment-vote-group mb-2">
+                        <button
+                          className={`glossy-button btn btn-sm me-2`}
+                          onClick={() => handleVote(comment._id, 'upvote')}
+                          disabled={!currentUser}
+                          title="Upvote"
+                        >
+                          <i className="bi bi-hand-thumbs-up me-1"></i>
+                          {Array.isArray(comment.upvotes) ? comment.upvotes.length : 0}
+                          {userHasUpvoted(comment) ? ' • You' : ''}
+                        </button>
+                        <button
+                          className="glossy-button btn btn-sm"
+                          onClick={() => handleVote(comment._id, 'downvote')}
+                          disabled={!currentUser}
+                          title="Downvote"
+                        >
+                          <i className="bi bi-hand-thumbs-down me-1"></i>
+                          {Array.isArray(comment.downvotes) ? comment.downvotes.length : 0}
+                          {userHasDownvoted(comment) ? ' • You' : ''}
+                        </button>
+                      </div>
+
                       <div className="d-flex">
                         <button
                           className="btn btn-link text-muted p-0 me-2"
@@ -462,9 +546,9 @@ function CommentSection({ insightId, currentUser }) {
                         >
                           <i className="bi bi-reply me-1"></i>Reply
                         </button>
-                        <button className="btn btn-link text-muted p-0">
+                        {/* <button className="btn btn-link text-muted p-0">
                           <i className="bi bi-heart me-1"></i>Like
-                        </button>
+                        </button> */}
                       </div>
 
                       {replyingTo === comment._id && (
@@ -592,7 +676,7 @@ function CommentSection({ insightId, currentUser }) {
                 </div>
               )}
 
-              {/* Restored Back-to-Insight scroll button */}
+              {/* Back-to-Insight scroll button */}
               <button className="btn btn-secondary btn-sm mt-3" onClick={handleScrollToInsight}>
                 Back to Insight
               </button>

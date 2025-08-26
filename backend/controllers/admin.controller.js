@@ -4,6 +4,7 @@ const Report = require('../models/Report');
 const Insight = require('../models/Insight');
 const Comment = require('../models/Comment');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const Log = require('../models/Log');
 
 /* ======================= helpers ======================= */
@@ -19,30 +20,52 @@ function parseDateRange(startDateStr, endDateStr) {
   return Object.keys(range).length ? range : undefined;
 }
 
-// details must be a STRING in Log schema → stringify safely
+// Log.details should be a STRING → stringify safely
 function stringifyDetails(obj) {
   if (typeof obj === 'string') return obj;
-  try { return JSON.stringify(obj ?? {}); } catch { return String(obj ?? ''); }
+  try {
+    return JSON.stringify(obj ?? {});
+  } catch {
+    return String(obj ?? '');
+  }
 }
 
 async function writeLog({ adminId, action, details }) {
   try {
+    if (!Log) return;
     await Log.create({
       adminId: adminId?.toString?.() || String(adminId || ''),
       action: action || '',
-      details: stringifyDetails(details), // <-- always a string
+      details: stringifyDetails(details),
     });
   } catch (e) {
     console.error('writeLog error:', e);
   }
 }
 
+// Notifications must never break the primary action
+async function safeNotify(payload) {
+  try {
+    await Notification.create(payload);
+  } catch (e) {
+    console.error('Notification error:', e.message);
+  }
+}
+
 /* ======================= Reports ======================= */
 
 // GET /api/admin/reports/pending
-exports.getPendingReports = async (_req, res) => {
+// Optional pagination support: ?itemType=Insight|Comment&page=&limit=
+exports.getPendingReports = async (req, res) => {
   try {
-    const reports = await Report.find({ status: 'pending' })
+    const { itemType, page, limit } = req.query;
+
+    const filter = { status: 'pending' };
+    if (itemType && ['Insight', 'Comment'].includes(itemType)) {
+      filter.reportedItemType = itemType;
+    }
+
+    const baseQuery = Report.find(filter)
       .sort({ createdAt: -1 })
       .populate('reporterId', 'username')
       .populate('resolvedBy', 'username')
@@ -52,6 +75,17 @@ exports.getPendingReports = async (_req, res) => {
       })
       .lean();
 
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    if (pageNum > 0 && limitNum > 0) {
+      const [items, total] = await Promise.all([
+        baseQuery.skip((pageNum - 1) * limitNum).limit(limitNum),
+        Report.countDocuments(filter),
+      ]);
+      return res.json({ items, page: pageNum, limit: limitNum, total });
+    }
+
+    const reports = await baseQuery;
     return res.json(reports);
   } catch (err) {
     console.error('getPendingReports error:', err);
@@ -59,7 +93,7 @@ exports.getPendingReports = async (_req, res) => {
   }
 };
 
-// GET /api/admin/reports/handled   (routes may also alias to /api/admin/handled-reports)
+// GET /api/admin/reports/handled   (alias: /api/admin/handled-reports)
 exports.getHandledReports = async (req, res) => {
   try {
     const { status, resolvedBy, startDate, endDate, itemType } = req.query;
@@ -71,13 +105,17 @@ exports.getHandledReports = async (req, res) => {
 
     const range = parseDateRange(startDate, endDate);
     if (range) {
+      // Prefer resolvedAt in range. If missing (legacy), fall back to createdAt.
       filter.$or = [
         { resolvedAt: range },
         { $and: [{ resolvedAt: { $exists: false } }, { createdAt: range }] },
       ];
     }
 
-    const handled = await Report.find(filter)
+    const page = Number.isFinite(+req.query.page) ? Math.max(1, parseInt(req.query.page, 10)) : null;
+    const limit = Number.isFinite(+req.query.limit) ? Math.max(1, Math.min(100, parseInt(req.query.limit, 10))) : null;
+
+    const baseQuery = Report.find(filter)
       .sort({ resolvedAt: -1, createdAt: -1 })
       .populate('reporterId', 'username')
       .populate('resolvedBy', 'username')
@@ -87,6 +125,15 @@ exports.getHandledReports = async (req, res) => {
       })
       .lean();
 
+    if (page && limit) {
+      const [items, total] = await Promise.all([
+        baseQuery.skip((page - 1) * limit).limit(limit),
+        Report.countDocuments(filter),
+      ]);
+      return res.json({ items, page, limit, total });
+    }
+
+    const handled = await baseQuery;
     return res.json(handled);
   } catch (err) {
     console.error('getHandledReports error:', err);
@@ -95,7 +142,7 @@ exports.getHandledReports = async (req, res) => {
 };
 
 // POST /api/admin/reports/:id/resolve
-// Accepts either { status: 'resolved'|'dismissed', note? }  OR  { dismiss: boolean, note? }
+// Accepts { status: 'resolved'|'dismissed', note? } OR { dismiss: boolean, note? }
 exports.resolveReportWithNote = async (req, res) => {
   try {
     const { id } = req.params;
@@ -123,9 +170,35 @@ exports.resolveReportWithNote = async (req, res) => {
 
     await writeLog({
       adminId,
-      action: `report:${status}`, // e.g., report:resolved | report:dismissed
+      action: `report:${status}`,
       details: { reportId: report._id.toString(), note: report.resolutionNote || '' },
     });
+
+    // 🔔 Notify the reporter with a helpful link
+    try {
+      let link = '';
+      if (report.reportedItemType === 'Comment') {
+        const c = await Comment.findById(report.reportedItemId).lean();
+        if (c) link = `/insights/${c.insightId}?commentId=${c._id}`;
+      } else if (report.reportedItemType === 'Insight') {
+        link = `/insights/${report.reportedItemId}`;
+      }
+      const type = status === 'resolved' ? 'report_resolved' : 'report_dismissed';
+      const message =
+        status === 'resolved'
+          ? `Your report was resolved.${report.resolutionNote ? ' Note: ' + report.resolutionNote : ''}`
+          : `Your report was dismissed.${report.resolutionNote ? ' Note: ' + report.resolutionNote : ''}`;
+
+      await safeNotify({
+        userId: report.reporterId,
+        type,
+        message,
+        link,
+        createdAt: new Date(),
+      });
+    } catch (e) {
+      console.error('notify reporter error:', e.message);
+    }
 
     return res.json({ message: 'Report updated', report });
   } catch (err) {
@@ -162,8 +235,8 @@ exports.getUserReportCount = async (req, res) => {
 
     const count = await Report.countDocuments({
       $or: [
-        { reportedItemType: 'Insight', reportedItemId: { $in: insightIds.map(x => x._id) } },
-        { reportedItemType: 'Comment', reportedItemId: { $in: commentIds.map(x => x._id) } },
+        { reportedItemType: 'Insight', reportedItemId: { $in: insightIds.map((x) => x._id) } },
+        { reportedItemType: 'Comment', reportedItemId: { $in: commentIds.map((x) => x._id) } },
       ],
     });
 
@@ -193,7 +266,21 @@ exports.banUser = async (req, res) => {
     await writeLog({
       adminId,
       action: 'user:ban',
-      details: { userId: user._id.toString(), until: user.bannedUntil, reason, incrementStrike: !!incrementStrike },
+      details: {
+        userId: user._id.toString(),
+        until: user.bannedUntil,
+        reason,
+        incrementStrike: !!incrementStrike,
+      },
+    });
+
+    // 🔔 Notify user
+    await safeNotify({
+      userId: user._id,
+      type: 'user_banned',
+      message: `You were banned${user.bannedUntil ? ` until ${user.bannedUntil.toLocaleString()}` : ''}.${reason ? ` Reason: ${reason}` : ''}`,
+      link: '',
+      createdAt: new Date(),
     });
 
     return res.json({ message: 'User banned', userId: user._id, bannedUntil: user.bannedUntil });
@@ -220,6 +307,15 @@ exports.unbanUser = async (req, res) => {
       adminId,
       action: 'user:unban',
       details: { userId: user._id.toString() },
+    });
+
+    // 🔔 Notify user
+    await safeNotify({
+      userId: user._id,
+      type: 'user_unbanned',
+      message: 'Your ban has been lifted.',
+      link: '',
+      createdAt: new Date(),
     });
 
     return res.json({ message: 'User unbanned', userId: user._id });
@@ -249,6 +345,17 @@ exports.hideInsight = async (req, res) => {
       details: { insightId: insight._id.toString() },
     });
 
+    // 🔔 Notify author only when hiding
+    if (insight.isHidden) {
+      await safeNotify({
+        userId: insight.userId,
+        type: 'content_hidden',
+        message: 'Your insight was hidden by an administrator.',
+        link: `/insights/${insight._id}`,
+        createdAt: new Date(),
+      });
+    }
+
     return res.json({ message: 'Insight visibility updated', insight });
   } catch (err) {
     console.error('hideInsight error:', err);
@@ -265,12 +372,22 @@ exports.deleteInsight = async (req, res) => {
     const insight = await Insight.findById(id);
     if (!insight) return res.status(404).json({ message: 'Insight not found' });
 
+    const authorId = insight.userId;
     await insight.deleteOne();
 
     await writeLog({
       adminId,
       action: 'insight:delete',
       details: { insightId: id.toString() },
+    });
+
+    // 🔔 Notify author
+    await safeNotify({
+      userId: authorId,
+      type: 'content_deleted',
+      message: 'Your insight was deleted by an administrator.',
+      link: `/insights/${id}`,
+      createdAt: new Date(),
     });
 
     return res.json({ message: 'Insight deleted' });
@@ -303,7 +420,23 @@ exports.hideComment = async (req, res) => {
       },
     });
 
-    return res.json({ message: 'Comment visibility updated', comment });
+    // 🔔 Notify author only when hiding
+    if (comment.isHidden) {
+      await safeNotify({
+        userId: comment.userId,
+        type: 'content_hidden',
+        message: 'Your comment was hidden by an administrator.',
+        link: `/insights/${comment.insightId}?commentId=${comment._id}`,
+        createdAt: new Date(),
+      });
+    }
+
+    // Return populated shape similar to comment.controller
+    const populated = await Comment.findById(comment._id)
+      .populate('userId', 'username profilePicture')
+      .lean();
+
+    return res.json(populated);
   } catch (err) {
     console.error('hideComment error:', err);
     return res.status(500).json({ message: 'Failed to update comment' });
@@ -316,17 +449,24 @@ exports.deleteComment = async (req, res) => {
     const { id } = req.params;
     const adminId = req.user?.id || req.user?._id?.toString();
 
-    const comment = await Comment.findById(id);
+    const comment = await Comment.findById(id).lean();
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
 
-    const insightId = comment.insightId?.toString?.() || String(comment.insightId || '');
-
-    await comment.deleteOne();
+    await Comment.deleteOne({ _id: id });
 
     await writeLog({
       adminId,
       action: 'comment:delete',
-      details: { commentId: id.toString(), insightId },
+      details: { commentId: id.toString(), insightId: comment.insightId?.toString?.() || String(comment.insightId || '') },
+    });
+
+    // 🔔 Notify author
+    await safeNotify({
+      userId: comment.userId,
+      type: 'content_deleted',
+      message: 'Your comment was deleted by an administrator.',
+      link: `/insights/${comment.insightId}?commentId=${id}`,
+      createdAt: new Date(),
     });
 
     return res.json({ message: 'Comment deleted' });

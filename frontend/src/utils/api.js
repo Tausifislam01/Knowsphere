@@ -239,16 +239,31 @@ export const reportContent = async (reportedItemType, reportedItemId, reason) =>
   return handle(res, 'Failed to submit report');
 };
 
-export const fetchReportedInsights = async () => {
-  const res = await fetch(`${API_URL}/admin/reports/pending`, { headers: authHeader() });
+// Pending — now optionally paginated (backward-compatible)
+export const fetchReportedInsights = async (params = {}) => {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+
+  const url = `${API_URL}/admin/reports/pending${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await fetch(url, { headers: authHeader() });
   const data = await handle(res, 'Failed to load reported insights');
-  return Array.isArray(data) ? data.filter(r => r?.reportedItemType === 'Insight') : [];
+
+  const list = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : [];
+  return list.filter((r) => r?.reportedItemType === 'Insight');
 };
 
-export const fetchReportedComments = async () => {
-  const res = await fetch(`${API_URL}/admin/reports/pending`, { headers: authHeader() });
+export const fetchReportedComments = async (params = {}) => {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+
+  const url = `${API_URL}/admin/reports/pending${qs.toString() ? `?${qs.toString()}` : ''}`;
+  const res = await fetch(url, { headers: authHeader() });
   const data = await handle(res, 'Failed to load reported comments');
-  return Array.isArray(data) ? data.filter(r => r?.reportedItemType === 'Comment') : [];
+
+  const list = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : [];
+  return list.filter((r) => r?.reportedItemType === 'Comment');
 };
 
 // ✅ send { status, note }
@@ -333,7 +348,7 @@ export const clearReadNotifications = async () => {
   return handle(res, 'Failed to clear notifications');
 };
 
-/* ---------------- Admin: Handled Reports (NEW) ---------------- */
+/* ---------------- Admin: Handled Reports (existing, tolerant) ---------------- */
 
 export const fetchHandledReports = async (params = {}) => {
   const qs = new URLSearchParams();
@@ -355,7 +370,7 @@ export const fetchHandledReports = async (params = {}) => {
   return [];
 };
 
-/* ---------------- Admin: Diagnostics (NEW) ---------------- */
+/* ---------------- Admin: Diagnostics (existing) ---------------- */
 
 export const fetchUserReportCount = async (userId) => {
   const res = await fetch(`${API_URL}/admin/user-report-count/${userId}`, {
@@ -363,4 +378,15 @@ export const fetchUserReportCount = async (userId) => {
   });
   const data = await handle(res, 'Failed to load report count');
   return typeof data?.count === 'number' ? data.count : 0;
+};
+
+/* ---------------- Comments: Voting (NEW) ---------------- */
+
+export const voteComment = async (commentId, voteType /* 'upvote' | 'downvote' */) => {
+  const res = await fetch(`${API_URL}/comments/${commentId}/vote`, {
+    method: 'POST',
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ voteType }),
+  });
+  return handle(res, 'Failed to vote on comment');
 };
