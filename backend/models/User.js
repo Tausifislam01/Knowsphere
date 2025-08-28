@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema({
   fullName: { type: String },
   bio: { type: String },
   profilePicture: { type: String, default: 'https://via.placeholder.com/150' },
+  profilePicturePublicId: { type: String, default: null },
   workplace: { type: String },
   facebook: { type: String },
   linkedin: { type: String },

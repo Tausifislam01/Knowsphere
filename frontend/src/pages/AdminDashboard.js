@@ -18,6 +18,21 @@ function AdminDashboard({ currentUser }) {
   const [handledReports, setHandledReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Pagination state (per tab)
+  const DEFAULT_LIMIT = 20;
+
+  const [insPage, setInsPage] = useState(1);
+  const [insTotal, setInsTotal] = useState(null);
+  const [insLimit] = useState(DEFAULT_LIMIT);
+
+  const [comPage, setComPage] = useState(1);
+  const [comTotal, setComTotal] = useState(null);
+  const [comLimit] = useState(DEFAULT_LIMIT);
+
+  const [handledPage, setHandledPage] = useState(1);
+  const [handledTotal, setHandledTotal] = useState(null);
+  const [handledLimit] = useState(DEFAULT_LIMIT);
+
   // Filters for "Handled" tab
   const [reportSearch, setReportSearch] = useState({
     status: '',       // '' | 'resolved' | 'dismissed'
@@ -57,6 +72,34 @@ function AdminDashboard({ currentUser }) {
     }
     return true;
   };
+
+  /* ───────────────── Helpers ───────────────── */
+
+  // Normalize API results to { items, total, page, limit }
+  const normalizePaged = (resp, fallbackLimit) => {
+    if (Array.isArray(resp)) {
+      return {
+        items: resp,
+        total: resp.length,
+        page: 1,
+        limit: resp.length || fallbackLimit || DEFAULT_LIMIT,
+      };
+    }
+    const items = resp?.items ?? [];
+    return {
+      items,
+      total: resp?.total ?? items.length,
+      page: resp?.page ?? 1,
+      limit: resp?.limit ?? (fallbackLimit || DEFAULT_LIMIT),
+    };
+  };
+
+  const rangeText = (page, limit, total) => {
+    if (!total) return '';
+    const from = (page - 1) * limit + 1;
+    const to = Math.min(total, page * limit);
+    return `Showing ${from}–${to} of ${total}`;
+    };
 
   /* ───────────────── Floating (top) horizontal scrollbar ───────────────── */
   const HScroll = ({ children }) => {
@@ -111,6 +154,33 @@ function AdminDashboard({ currentUser }) {
     );
   };
 
+  const Pager = ({ page, total, limit, onPrev, onNext }) => {
+    if (total == null) return null;
+    const canPrev = page > 1;
+    const canNext = page * limit < total;
+    return (
+      <div className="d-flex justify-content-between align-items-center mt-2">
+        <small className="text-muted">{rangeText(page, limit, total)}</small>
+        <div>
+          <button
+            className="btn btn-sm btn-outline-secondary me-2"
+            disabled={!canPrev}
+            onClick={onPrev}
+          >
+            Prev
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            disabled={!canNext}
+            onClick={onNext}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   /** ----------------- Resolve / Dismiss ----------------- */
   const dismissReport = async (reportId) => {
     if (!ensureAuthOrRedirect()) return;
@@ -158,24 +228,7 @@ function AdminDashboard({ currentUser }) {
     }
   };
 
-  /** ----------------- Data loaders ----------------- */
-  const loadHandledReports = async () => {
-    if (!ensureAuthOrRedirect()) return;
-    try {
-      const list = await fetchHandledReports({
-        status: reportSearch.status,
-        resolvedBy: reportSearch.resolvedBy,
-        startDate: reportSearch.startDate,
-        endDate: reportSearch.endDate,
-        itemType: reportSearch.itemType,
-      });
-      const withCounts = await attachUserReportCounts(list);
-      setHandledReports(withCounts);
-    } catch (e) {
-      console.error('loadHandledReports error:', e);
-      toast.error('Failed to load handled reports', { autoClose: 2000 });
-    }
-  };
+  /* ----------------- Data loaders (with pagination) ----------------- */
 
   const attachUserReportCounts = async (items) => {
     return Promise.all(
@@ -194,19 +247,65 @@ function AdminDashboard({ currentUser }) {
     );
   };
 
+  const loadPendingInsights = async () => {
+    const resp = await fetchReportedInsights({ page: insPage, limit: insLimit });
+    const { items, total, page } = normalizePaged(resp, insLimit);
+    const withCounts = await attachUserReportCounts(items);
+    setReportedInsights(withCounts);
+    setInsTotal(total);
+    // keep page in sync if server adjusted it
+    if (page !== insPage) setInsPage(page);
+  };
+
+  const loadPendingComments = async () => {
+    const resp = await fetchReportedComments({ page: comPage, limit: comLimit });
+    const { items, total, page } = normalizePaged(resp, comLimit);
+    const withCounts = await attachUserReportCounts(items);
+    setReportedComments(withCounts);
+    setComTotal(total);
+    if (page !== comPage) setComPage(page);
+  };
+
+  const loadHandledReports = async () => {
+    if (!ensureAuthOrRedirect()) return;
+    try {
+      const resp = await fetchHandledReports({
+        status: reportSearch.status,
+        resolvedBy: reportSearch.resolvedBy,
+        startDate: reportSearch.startDate,
+        endDate: reportSearch.endDate,
+        itemType: reportSearch.itemType,
+        page: handledPage,
+        limit: handledLimit,
+      });
+      const { items, total, page } = normalizePaged(resp, handledLimit);
+      const withCounts = await attachUserReportCounts(items);
+      setHandledReports(withCounts);
+      setHandledTotal(total);
+      if (page !== handledPage) setHandledPage(page);
+    } catch (e) {
+      console.error('loadHandledReports error:', e);
+      toast.error('Failed to load handled reports', { autoClose: 2000 });
+    }
+  };
+
   const refreshActiveTab = async () => {
     if (activeTab === 'insights') {
-      const list = await fetchReportedInsights();
-      const withCounts = await attachUserReportCounts(list);
-      setReportedInsights(withCounts);
+      await loadPendingInsights();
     } else if (activeTab === 'comments') {
-      const list = await fetchReportedComments();
-      const withCounts = await attachUserReportCounts(list);
-      setReportedComments(withCounts);
+      await loadPendingComments();
     } else if (activeTab === 'logs') {
       await loadHandledReports();
     }
   };
+
+  // Reset page when switching tabs or changing handled filters
+  useEffect(() => {
+    if (activeTab === 'insights') setInsPage(1);
+    if (activeTab === 'comments') setComPage(1);
+    if (activeTab === 'logs') setHandledPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   useEffect(() => {
     (async () => {
@@ -217,8 +316,9 @@ function AdminDashboard({ currentUser }) {
         setIsLoading(false);
       }
     })();
+    // Include page changes so pager buttons fetch correctly
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, reportSearch]);
+  }, [activeTab, reportSearch, insPage, comPage, handledPage]);
 
   /** ----------------- Hide/Unhide (toggle) ----------------- */
   const clickHideInsight = async (insightId, isHidden) => {
@@ -452,274 +552,294 @@ function AdminDashboard({ currentUser }) {
                 <div>
                   {/* ----------------- Insights Tab ----------------- */}
                   {activeTab === 'insights' && (
-                    <HScroll>
-                      {reportedInsights.length === 0 ? (
-                        <EmptyState message="No reported insights to display" />
-                      ) : (
-                        <table className="table table-sm align-middle">
-                          <thead className="table-light sticky-top">
-                            <tr>
-                              <th style={{ minWidth: 120 }}>Insight ID</th>
-                              <th style={{ minWidth: 240 }}>Title</th>
-                              <th style={{ minWidth: 160 }}>Author</th>
-                              <th style={{ minWidth: 200 }}>Reason</th>
-                              <th style={{ minWidth: 160 }}>Reporter</th>
-                              <th style={{ minWidth: 120 }}>User Reports</th>
-                              <th style={{ minWidth: 420 }}>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {reportedInsights.map((report) => {
-                              const authorName =
-                                report?.reportedItemId?.userId?.username ||
-                                report?.contentSnapshot?.authorUsername ||
-                                'Unknown';
-                              const authorId =
-                                report?.reportedItemId?.userId?._id ||
-                                report?.contentSnapshot?.authorId;
-                              const isAdmin =
-                                report?.reportedItemId?.userId?.isAdmin;
-                              const isBanned =
-                                report?.reportedItemId?.userId?.isBanned;
-                              const insightId = report?.reportedItemId?._id;
+                    <>
+                      <HScroll>
+                        {reportedInsights.length === 0 ? (
+                          <EmptyState message="No reported insights to display" />
+                        ) : (
+                          <table className="table table-sm align-middle">
+                            <thead className="table-light sticky-top">
+                              <tr>
+                                <th style={{ minWidth: 120 }}>Insight ID</th>
+                                <th style={{ minWidth: 240 }}>Title</th>
+                                <th style={{ minWidth: 160 }}>Author</th>
+                                <th style={{ minWidth: 200 }}>Reason</th>
+                                <th style={{ minWidth: 160 }}>Reporter</th>
+                                <th style={{ minWidth: 120 }}>User Reports</th>
+                                <th style={{ minWidth: 420 }}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {reportedInsights.map((report) => {
+                                const authorName =
+                                  report?.reportedItemId?.userId?.username ||
+                                  report?.contentSnapshot?.authorUsername ||
+                                  'Unknown';
+                                const authorId =
+                                  report?.reportedItemId?.userId?._id ||
+                                  report?.contentSnapshot?.authorId;
+                                const isAdmin =
+                                  report?.reportedItemId?.userId?.isAdmin;
+                                const isBanned =
+                                  report?.reportedItemId?.userId?.isBanned;
+                                const insightId = report?.reportedItemId?._id;
 
-                              return (
-                                <tr key={report._id || Math.random()}>
-                                  <td className="text-monospace small">
-                                    {insightId ?? 'N/A'}
-                                  </td>
-                                  <td className="text-truncate" style={{ maxWidth: 280 }}>
-                                    <Link
-                                      to={insightId ? `/insights/${insightId}` : '#'}
-                                      className="text-decoration-none"
-                                      title={
-                                        report?.reportedItemId?.title ||
-                                        report?.contentSnapshot?.title ||
-                                        '(deleted)'
-                                      }
-                                    >
-                                      {report?.reportedItemId?.title ??
-                                        report?.contentSnapshot?.title ??
-                                        '(deleted)'}
-                                    </Link>
-                                  </td>
-                                  <td>
-                                    {authorId ? (
-                                      <Link to={`/profile/${authorId}`} className="text-decoration-none">
-                                        {authorName}
-                                      </Link>
-                                    ) : (
-                                      authorName
-                                    )}
-                                  </td>
-                                  <td
-                                    className="text-truncate"
-                                    style={{ maxWidth: 260 }}
-                                    title={report.reason || 'No reason provided'}
-                                  >
-                                    {report.reason || 'No reason provided'}
-                                  </td>
-                                  <td>
-                                    {report.reporterId?._id ? (
-                                      <Link to={`/profile/${report.reporterId._id}`} className="text-decoration-none">
-                                        {report.reporterId?.username || 'Unknown'}
-                                      </Link>
-                                    ) : (
-                                      'Unknown'
-                                    )}
-                                  </td>
-                                  <td>
-                                    <span className="badge bg-secondary-subtle text-dark border">
-                                      {report.userReportCount || 0}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <ActionButtons>
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary"
-                                        onClick={() => dismissReport(report._id)}
-                                        title="Dismiss report"
+                                return (
+                                  <tr key={report._id || Math.random()}>
+                                    <td className="text-monospace small">
+                                      {insightId ?? 'N/A'}
+                                    </td>
+                                    <td className="text-truncate" style={{ maxWidth: 280 }}>
+                                      <Link
+                                        to={insightId ? `/insights/${insightId}` : '#'}
+                                        className="text-decoration-none"
+                                        title={
+                                          report?.reportedItemId?.title ||
+                                          report?.contentSnapshot?.title ||
+                                          '(deleted)'
+                                        }
                                       >
-                                        Dismiss
-                                      </button>
-                                      <button
-                                        className="btn btn-sm btn-success"
-                                        onClick={() => openResolveModal(report._id, 'resolved')}
-                                        title="Resolve with note"
-                                      >
-                                        Resolve…
-                                      </button>
-                                      {insightId && (
-                                        <>
-                                          <button
-                                            className="btn btn-sm btn-outline-warning"
-                                            onClick={() =>
-                                              clickHideInsight(
-                                                report.reportedItemId._id,
-                                                report?.reportedItemId?.isHidden
-                                              )
-                                            }
-                                            disabled={!!busy[`ins:${report.reportedItemId._id}`]}
-                                            title={report?.reportedItemId?.isHidden ? 'Unhide insight' : 'Hide insight'}
-                                          >
-                                            {report?.reportedItemId?.isHidden ? 'Unhide' : 'Hide'}
-                                          </button>
-                                          <button
-                                            className="btn btn-sm btn-danger"
-                                            onClick={() => clickDeleteInsight(report.reportedItemId._id)}
-                                            disabled={!!busy[`ins:${report.reportedItemId._id}`]}
-                                            title="Delete insight"
-                                          >
-                                            Delete
-                                          </button>
-                                        </>
+                                        {report?.reportedItemId?.title ??
+                                          report?.contentSnapshot?.title ??
+                                          '(deleted)'}
+                                      </Link>
+                                    </td>
+                                    <td>
+                                      {authorId ? (
+                                        <Link to={`/profile/${authorId}`} className="text-decoration-none">
+                                          {authorName}
+                                        </Link>
+                                      ) : (
+                                        authorName
                                       )}
-                                      <BanButton userId={authorId} isAdmin={isAdmin} isBanned={isBanned} />
-                                    </ActionButtons>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      )}
-                    </HScroll>
+                                    </td>
+                                    <td
+                                      className="text-truncate"
+                                      style={{ maxWidth: 260 }}
+                                      title={report.reason || 'No reason provided'}
+                                    >
+                                      {report.reason || 'No reason provided'}
+                                    </td>
+                                    <td>
+                                      {report.reporterId?._id ? (
+                                        <Link to={`/profile/${report.reporterId._id}`} className="text-decoration-none">
+                                          {report.reporterId?.username || 'Unknown'}
+                                        </Link>
+                                      ) : (
+                                        'Unknown'
+                                      )}
+                                    </td>
+                                    <td>
+                                      <span className="badge bg-secondary-subtle text-dark border">
+                                        {report.userReportCount || 0}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <ActionButtons>
+                                        <button
+                                          className="btn btn-sm btn-outline-secondary"
+                                          onClick={() => dismissReport(report._id)}
+                                          title="Dismiss report"
+                                        >
+                                          Dismiss
+                                        </button>
+                                        <button
+                                          className="btn btn-sm btn-success"
+                                          onClick={() => openResolveModal(report._id, 'resolved')}
+                                          title="Resolve with note"
+                                        >
+                                          Resolve…
+                                        </button>
+                                        {insightId && (
+                                          <>
+                                            <button
+                                              className="btn btn-sm btn-outline-warning"
+                                              onClick={() =>
+                                                clickHideInsight(
+                                                  report.reportedItemId._id,
+                                                  report?.reportedItemId?.isHidden
+                                                )
+                                              }
+                                              disabled={!!busy[`ins:${report.reportedItemId._id}`]}
+                                              title={report?.reportedItemId?.isHidden ? 'Unhide insight' : 'Hide insight'}
+                                            >
+                                              {report?.reportedItemId?.isHidden ? 'Unhide' : 'Hide'}
+                                            </button>
+                                            <button
+                                              className="btn btn-sm btn-danger"
+                                              onClick={() => clickDeleteInsight(report.reportedItemId._id)}
+                                              disabled={!!busy[`ins:${report.reportedItemId._id}`]}
+                                              title="Delete insight"
+                                            >
+                                              Delete
+                                            </button>
+                                          </>
+                                        )}
+                                        <BanButton userId={authorId} isAdmin={isAdmin} isBanned={isBanned} />
+                                      </ActionButtons>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </HScroll>
+
+                      <Pager
+                        page={insPage}
+                        total={insTotal}
+                        limit={insLimit}
+                        onPrev={() => setInsPage((p) => Math.max(1, p - 1))}
+                        onNext={() => setInsPage((p) => (insTotal && p * insLimit < insTotal ? p + 1 : p))}
+                      />
+                    </>
                   )}
 
                   {/* ----------------- Comments Tab ----------------- */}
                   {activeTab === 'comments' && (
-                    <HScroll>
-                      {reportedComments.length === 0 ? (
-                        <EmptyState message="No reported comments to display" />
-                      ) : (
-                        <table className="table table-sm align-middle">
-                          <thead className="table-light sticky-top">
-                            <tr>
-                              <th style={{ minWidth: 120 }}>Comment ID</th>
-                              <th style={{ minWidth: 240 }}>Content</th>
-                              <th style={{ minWidth: 160 }}>Author</th>
-                              <th style={{ minWidth: 200 }}>Reason</th>
-                              <th style={{ minWidth: 160 }}>Reporter</th>
-                              <th style={{ minWidth: 120 }}>User Reports</th>
-                              <th style={{ minWidth: 340 }}>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {reportedComments.map((report) => {
-                              const authorName =
-                                report?.reportedItemId?.userId?.username ||
-                                report?.contentSnapshot?.authorUsername ||
-                                'Unknown';
-                              const authorId =
-                                report?.reportedItemId?.userId?._id ||
-                                report?.contentSnapshot?.authorId;
-                              const isAdmin =
-                                report?.reportedItemId?.userId?.isAdmin;
-                              const isBanned =
-                                report?.reportedItemId?.userId?.isBanned;
-                              const commentId = report?.reportedItemId?._id;
-                              const isHidden = report?.reportedItemId?.isHidden ?? false;
+                    <>
+                      <HScroll>
+                        {reportedComments.length === 0 ? (
+                          <EmptyState message="No reported comments to display" />
+                        ) : (
+                          <table className="table table-sm align-middle">
+                            <thead className="table-light sticky-top">
+                              <tr>
+                                <th style={{ minWidth: 120 }}>Comment ID</th>
+                                <th style={{ minWidth: 240 }}>Content</th>
+                                <th style={{ minWidth: 160 }}>Author</th>
+                                <th style={{ minWidth: 200 }}>Reason</th>
+                                <th style={{ minWidth: 160 }}>Reporter</th>
+                                <th style={{ minWidth: 120 }}>User Reports</th>
+                                <th style={{ minWidth: 340 }}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {reportedComments.map((report) => {
+                                const authorName =
+                                  report?.reportedItemId?.userId?.username ||
+                                  report?.contentSnapshot?.authorUsername ||
+                                  'Unknown';
+                                const authorId =
+                                  report?.reportedItemId?.userId?._id ||
+                                  report?.contentSnapshot?.authorId;
+                                const isAdmin =
+                                  report?.reportedItemId?.userId?.isAdmin;
+                                const isBanned =
+                                  report?.reportedItemId?.userId?.isBanned;
+                                const commentId = report?.reportedItemId?._id;
+                                const isHidden = report?.reportedItemId?.isHidden ?? false;
 
-                              return (
-                                <tr key={report._id || Math.random()}>
-                                  <td className="text-monospace small">{commentId ?? 'N/A'}</td>
-                                  <td>
-                                    <div>
-                                      <div
-                                        className="text-truncate"
-                                        style={{ maxWidth: 320 }}
-                                        title={
-                                          report?.reportedItemId?.text ??
-                                          report?.contentSnapshot?.text ??
-                                          '(deleted)'
-                                        }
-                                      >
-                                        {report?.reportedItemId?.text ??
-                                          report?.contentSnapshot?.text ??
-                                          '(deleted)'}
+                                return (
+                                  <tr key={report._id || Math.random()}>
+                                    <td className="text-monospace small">{commentId ?? 'N/A'}</td>
+                                    <td>
+                                      <div>
+                                        <div
+                                          className="text-truncate"
+                                          style={{ maxWidth: 320 }}
+                                          title={
+                                            report?.reportedItemId?.text ??
+                                            report?.contentSnapshot?.text ??
+                                            '(deleted)'
+                                          }
+                                        >
+                                          {report?.reportedItemId?.text ??
+                                            report?.contentSnapshot?.text ??
+                                            '(deleted)'}
+                                        </div>
+                                        {(report?.reportedItemId?.insightId ||
+                                          report?.contentSnapshot?.insightId) && (
+                                          <Link
+                                            to={`/insights/${
+                                              report?.reportedItemId?.insightId ||
+                                              report?.contentSnapshot?.insightId
+                                            }${commentId ? `#comment-${commentId}` : ''}`}
+                                            className="small text-decoration-none"
+                                          >
+                                            View in context
+                                          </Link>
+                                        )}
                                       </div>
-                                      {(report?.reportedItemId?.insightId ||
-                                        report?.contentSnapshot?.insightId) && (
+                                    </td>
+                                    <td>{authorName}</td>
+                                    <td
+                                      className="text-truncate"
+                                      style={{ maxWidth: 260 }}
+                                      title={report.reason || 'No reason provided'}
+                                    >
+                                      {report.reason || 'No reason provided'}
+                                    </td>
+                                    <td>
+                                      {report.reporterId?._id ? (
                                         <Link
-                                          to={`/insights/${
-                                            report?.reportedItemId?.insightId ||
-                                            report?.contentSnapshot?.insightId
-                                          }${commentId ? `#comment-${commentId}` : ''}`}
-                                          className="small text-decoration-none"
+                                          to={`/profile/${report.reporterId._id}`}
+                                          className="text-decoration-none"
                                         >
-                                          View in context
+                                          {report.reporterId?.username || 'Unknown'}
                                         </Link>
+                                      ) : (
+                                        'Unknown'
                                       )}
-                                    </div>
-                                  </td>
-                                  <td>{authorName}</td>
-                                  <td
-                                    className="text-truncate"
-                                    style={{ maxWidth: 260 }}
-                                    title={report.reason || 'No reason provided'}
-                                  >
-                                    {report.reason || 'No reason provided'}
-                                  </td>
-                                  <td>
-                                    {report.reporterId?._id ? (
-                                      <Link
-                                        to={`/profile/${report.reporterId._id}`}
-                                        className="text-decoration-none"
-                                      >
-                                        {report.reporterId?.username || 'Unknown'}
-                                      </Link>
-                                    ) : (
-                                      'Unknown'
-                                    )}
-                                  </td>
-                                  <td>
-                                    <span className="badge bg-secondary-subtle text-dark border">
-                                      {report.userReportCount || 0}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <ActionButtons>
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary"
-                                        onClick={() => dismissReport(report._id)}
-                                      >
-                                        Dismiss
-                                      </button>
-                                      <button
-                                        className="btn btn-sm btn-success"
-                                        onClick={() => openResolveModal(report._id, 'resolved')}
-                                      >
-                                        Resolve…
-                                      </button>
-                                      {commentId && (
+                                    </td>
+                                    <td>
+                                      <span className="badge bg-secondary-subtle text-dark border">
+                                        {report.userReportCount || 0}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      <ActionButtons>
                                         <button
-                                          className="btn btn-sm btn-outline-warning"
-                                          onClick={() => clickHideComment(commentId, isHidden)}
-                                          disabled={!!busy[`com:${report.reportedItemId._id}`]}
+                                          className="btn btn-sm btn-outline-secondary"
+                                          onClick={() => dismissReport(report._id)}
                                         >
-                                          {isHidden ? 'Unhide' : 'Hide'}
+                                          Dismiss
                                         </button>
-                                      )}
-                                      <button
-                                        className="btn btn-sm btn-danger"
-                                        onClick={() =>
-                                          report?.reportedItemId?._id &&
-                                          clickDeleteComment(report.reportedItemId._id)
-                                        }
-                                        disabled={!report?.reportedItemId?._id}
-                                      >
-                                        Delete
-                                      </button>
-                                      <BanButton userId={authorId} isAdmin={isAdmin} isBanned={isBanned} />
-                                    </ActionButtons>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      )}
-                    </HScroll>
+                                        <button
+                                          className="btn btn-sm btn-success"
+                                          onClick={() => openResolveModal(report._id, 'resolved')}
+                                        >
+                                          Resolve…
+                                        </button>
+                                        {commentId && (
+                                          <button
+                                            className="btn btn-sm btn-outline-warning"
+                                            onClick={() => clickHideComment(commentId, isHidden)}
+                                            disabled={!!busy[`com:${report.reportedItemId._id}`]}
+                                          >
+                                            {isHidden ? 'Unhide' : 'Hide'}
+                                          </button>
+                                        )}
+                                        <button
+                                          className="btn btn-sm btn-danger"
+                                          onClick={() =>
+                                            report?.reportedItemId?._id &&
+                                            clickDeleteComment(report.reportedItemId._id)
+                                          }
+                                          disabled={!report?.reportedItemId?._id}
+                                        >
+                                          Delete
+                                        </button>
+                                        <BanButton userId={authorId} isAdmin={isAdmin} isBanned={isBanned} />
+                                      </ActionButtons>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </HScroll>
+
+                      <Pager
+                        page={comPage}
+                        total={comTotal}
+                        limit={comLimit}
+                        onPrev={() => setComPage((p) => Math.max(1, p - 1))}
+                        onNext={() => setComPage((p) => (comTotal && p * comLimit < comTotal ? p + 1 : p))}
+                      />
+                    </>
                   )}
 
                   {/* ----------------- Handled Tab ----------------- */}
@@ -731,7 +851,10 @@ function AdminDashboard({ currentUser }) {
                           <select
                             className="form-select form-select-sm"
                             value={reportSearch.status}
-                            onChange={(e) => setReportSearch({ ...reportSearch, status: e.target.value })}
+                            onChange={(e) => {
+                              setReportSearch({ ...reportSearch, status: e.target.value });
+                              setHandledPage(1);
+                            }}
                           >
                             <option value="">Any</option>
                             <option value="resolved">Resolved</option>
@@ -745,7 +868,10 @@ function AdminDashboard({ currentUser }) {
                             className="form-control form-control-sm"
                             placeholder="642e… (optional)"
                             value={reportSearch.resolvedBy}
-                            onChange={(e) => setReportSearch({ ...reportSearch, resolvedBy: e.target.value })}
+                            onChange={(e) => {
+                              setReportSearch({ ...reportSearch, resolvedBy: e.target.value });
+                              setHandledPage(1);
+                            }}
                           />
                         </div>
                         <div className="col-md-2">
@@ -754,7 +880,10 @@ function AdminDashboard({ currentUser }) {
                             type="date"
                             className="form-control form-control-sm"
                             value={reportSearch.startDate}
-                            onChange={(e) => setReportSearch({ ...reportSearch, startDate: e.target.value })}
+                            onChange={(e) => {
+                              setReportSearch({ ...reportSearch, startDate: e.target.value });
+                              setHandledPage(1);
+                            }}
                           />
                         </div>
                         <div className="col-md-2">
@@ -763,7 +892,10 @@ function AdminDashboard({ currentUser }) {
                             type="date"
                             className="form-control form-control-sm"
                             value={reportSearch.endDate}
-                            onChange={(e) => setReportSearch({ ...reportSearch, endDate: e.target.value })}
+                            onChange={(e) => {
+                              setReportSearch({ ...reportSearch, endDate: e.target.value });
+                              setHandledPage(1);
+                            }}
                           />
                         </div>
                         <div className="col-md-2">
@@ -771,7 +903,10 @@ function AdminDashboard({ currentUser }) {
                           <select
                             className="form-select form-select-sm"
                             value={reportSearch.itemType}
-                            onChange={(e) => setReportSearch({ ...reportSearch, itemType: e.target.value })}
+                            onChange={(e) => {
+                              setReportSearch({ ...reportSearch, itemType: e.target.value });
+                              setHandledPage(1);
+                            }}
                           >
                             <option value="">Any</option>
                             <option value="Insight">Insight</option>
@@ -891,6 +1026,16 @@ function AdminDashboard({ currentUser }) {
                           </table>
                         )}
                       </HScroll>
+
+                      <Pager
+                        page={handledPage}
+                        total={handledTotal}
+                        limit={handledLimit}
+                        onPrev={() => setHandledPage((p) => Math.max(1, p - 1))}
+                        onNext={() =>
+                          setHandledPage((p) => (handledTotal && p * handledLimit < handledTotal ? p + 1 : p))
+                        }
+                      />
                     </div>
                   )}
                 </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 
 function Login({ onLogin }) {
   const [formData, setFormData] = useState({
@@ -9,6 +9,7 @@ function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,7 +31,7 @@ function Login({ onLogin }) {
     e.preventDefault();
     setError('');
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
     try {
       const response = await fetch('http://localhost:5000/api/auth/login', {
@@ -67,12 +68,21 @@ function Login({ onLogin }) {
                 </h2>
               </div>
               <div className="card-body p-4 p-md-5">
+                {/* ✅ Success alert shown when redirected from Signup */}
+                {location.state?.fromSignup && (
+                  <div className="alert alert-success d-flex align-items-center" role="alert">
+                    <i className="bi bi-check-circle-fill me-2"></i>
+                    <div>{location.state.msg || 'Account created. Please log in.'}</div>
+                  </div>
+                )}
+
                 {error && (
                   <div className="alert alert-danger d-flex align-items-center" role="alert">
                     <i className="bi bi-exclamation-triangle-fill me-2"></i>
                     <div>{error}</div>
                   </div>
                 )}
+
                 <form onSubmit={handleSubmit} className="needs-validation" noValidate>
                   <div className="mb-4">
                     <label htmlFor="username" className="form-label fw-semibold">
@@ -94,6 +104,7 @@ function Login({ onLogin }) {
                       />
                     </div>
                   </div>
+
                   <div className="mb-4">
                     <label htmlFor="password" className="form-label fw-semibold">
                       Password <span className="text-danger">*</span>
@@ -114,6 +125,7 @@ function Login({ onLogin }) {
                       />
                     </div>
                   </div>
+
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <div className="form-check">
                       <input
@@ -129,6 +141,7 @@ function Login({ onLogin }) {
                       Forgot password?
                     </Link>
                   </div>
+
                   <button
                     type="submit"
                     className="glossy-button w-100 py-3 fw-bold"
@@ -136,7 +149,11 @@ function Login({ onLogin }) {
                   >
                     {isLoading ? (
                       <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span
+                          className="spinner-border spinner-border-sm me-2"
+                          role="status"
+                          aria-hidden="true"
+                        ></span>
                         Logging in...
                       </>
                     ) : (
@@ -147,6 +164,7 @@ function Login({ onLogin }) {
                     )}
                   </button>
                 </form>
+
                 <div className="text-center mt-4">
                   <p className="mb-0">
                     Don't have an account?{' '}

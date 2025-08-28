@@ -155,7 +155,20 @@ export const updateInsight = async (id, payload) => {
   return handle(res, 'Failed to update insight');
 };
 
-export const deleteInsight = async (id) => {
+/**
+ * Delete an insight.
+ * - If `reason` is provided (string), use the **admin** path and include `{ reason }` in the body.
+ * - Otherwise, use the normal user path.
+ */
+export const deleteInsight = async (id, reason) => {
+  if (typeof reason === 'string') {
+    const res = await fetch(`${API_URL}/admin/insights/${id}`, {
+      method: 'DELETE',
+      headers: jsonAuthHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+    return handle(res, 'Failed to delete insight');
+  }
   const res = await fetch(`${API_URL}/insights/${id}`, {
     method: 'DELETE',
     headers: authHeader(),
@@ -239,31 +252,28 @@ export const reportContent = async (reportedItemType, reportedItemId, reason) =>
   return handle(res, 'Failed to submit report');
 };
 
-// Pending — now optionally paginated (backward-compatible)
+// Pending — optionally paginated; pass itemType so the server filters & counts correctly.
+// Returns raw data: either an array OR { items, page, limit, total }.
 export const fetchReportedInsights = async (params = {}) => {
   const qs = new URLSearchParams();
+  qs.set('itemType', 'Insight');
   if (params.page) qs.set('page', String(params.page));
   if (params.limit) qs.set('limit', String(params.limit));
 
   const url = `${API_URL}/admin/reports/pending${qs.toString() ? `?${qs.toString()}` : ''}`;
   const res = await fetch(url, { headers: authHeader() });
-  const data = await handle(res, 'Failed to load reported insights');
-
-  const list = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : [];
-  return list.filter((r) => r?.reportedItemType === 'Insight');
+  return handle(res, 'Failed to load reported insights');
 };
 
 export const fetchReportedComments = async (params = {}) => {
   const qs = new URLSearchParams();
+  qs.set('itemType', 'Comment');
   if (params.page) qs.set('page', String(params.page));
   if (params.limit) qs.set('limit', String(params.limit));
 
   const url = `${API_URL}/admin/reports/pending${qs.toString() ? `?${qs.toString()}` : ''}`;
   const res = await fetch(url, { headers: authHeader() });
-  const data = await handle(res, 'Failed to load reported comments');
-
-  const list = Array.isArray(data) ? data : Array.isArray(data.items) ? data.items : [];
-  return list.filter((r) => r?.reportedItemType === 'Comment');
+  return handle(res, 'Failed to load reported comments');
 };
 
 // ✅ send { status, note }
@@ -276,27 +286,30 @@ export const resolveReportWithNote = async (reportId, status = 'resolved', note 
   return handle(res, 'Failed to update report');
 };
 
-// Admin-only hide/unhide & deletes
-export const hideInsight = async (id) => {
+// Admin-only hide/unhide & deletes — include optional { reason }
+export const hideInsight = async (id, reason = '') => {
   const res = await fetch(`${API_URL}/admin/insights/${id}/hide`, {
     method: 'PUT',
-    headers: authHeader(),
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ reason }),
   });
   return handle(res, 'Failed to toggle insight visibility');
 };
 
-export const hideComment = async (commentId) => {
+export const hideComment = async (commentId, reason = '') => {
   const res = await fetch(`${API_URL}/admin/comments/${commentId}/hide`, {
     method: 'PUT',
-    headers: authHeader(),
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ reason }),
   });
   return handle(res, 'Failed to toggle comment visibility');
 };
 
-export const deleteComment = async (commentId) => {
+export const deleteComment = async (commentId, reason = '') => {
   const res = await fetch(`${API_URL}/admin/comments/${commentId}`, {
     method: 'DELETE',
-    headers: authHeader(),
+    headers: jsonAuthHeaders(),
+    body: JSON.stringify({ reason }),
   });
   return handle(res, 'Failed to delete comment');
 };
@@ -348,8 +361,9 @@ export const clearReadNotifications = async () => {
   return handle(res, 'Failed to clear notifications');
 };
 
-/* ---------------- Admin: Handled Reports (existing, tolerant) ---------------- */
+/* ---------------- Admin: Handled Reports ---------------- */
 
+// Returns raw data: either an array OR { items, page, limit, total }
 export const fetchHandledReports = async (params = {}) => {
   const qs = new URLSearchParams();
   if (params.status) qs.set('status', params.status);
@@ -362,12 +376,7 @@ export const fetchHandledReports = async (params = {}) => {
 
   const url = `${API_URL}/admin/reports/handled${qs.toString() ? `?${qs.toString()}` : ''}`;
   const res = await fetch(url, { headers: authHeader() });
-  const data = await handle(res, 'Failed to load handled reports');
-
-  // Be tolerant to both shapes: array OR { items, page, limit, total }
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray(data.items)) return data.items;
-  return [];
+  return handle(res, 'Failed to load handled reports');
 };
 
 /* ---------------- Admin: Diagnostics (existing) ---------------- */

@@ -1,8 +1,11 @@
-// backend/routes/authroutes.js (MVC refactor)
+// backend/routes/authroutes.js (MVC-aligned)
 const express = require('express');
 const router = express.Router();
 const { auth, adminAuth } = require('../middleware/auth');
 const Auth = require('../controllers/auth.controller');
+
+// Multer-only middleware (no Cloudinary logic here)
+const media = require('../middleware/media');
 
 // Basic auth
 router.post('/signup', Auth.signup);
@@ -12,7 +15,7 @@ router.post('/forgot-password', Auth.forgotPassword);
 // Profile
 router.get('/profile', auth, Auth.getProfile);
 router.get('/profile/:id', auth, Auth.getProfileById);
-router.put('/profile', auth, Auth.updateProfile);
+router.put('/profile', auth, media.uploadAvatar, Auth.updateProfile);
 router.put('/change-password', auth, Auth.changePassword);
 router.delete('/delete', auth, Auth.deleteProfile);
 

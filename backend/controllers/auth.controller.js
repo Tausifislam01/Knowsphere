@@ -3,6 +3,49 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+// --- Cloudinary (MVC: business logic in controller) ---
+const { v2: cloudinary } = require('cloudinary');
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// --- local helpers (kept inside controller) ---
+function isCloudinaryUrl(url) {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return u.hostname.endsWith('res.cloudinary.com');
+  } catch {
+    return false;
+  }
+}
+
+function getPublicIdFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const p = u.pathname; // may include transformations
+    const idx = p.indexOf('/upload/');
+    if (idx === -1) return null;
+    let rest = p.slice(idx + '/upload/'.length);
+    // strip version like v1712345678/
+    rest = rest.replace(/^v\d+\//, '');
+    // strip final extension only
+    const lastDot = rest.lastIndexOf('.');
+    if (lastDot > -1) rest = rest.slice(0, lastDot);
+    return rest.replace(/^\/+|\/+$/g, '');
+  } catch {
+    return null;
+  }
+}
+
+function bufferToDataURI(buffer, mimetype) {
+  const base64 = buffer.toString('base64');
+  return `data:${mimetype};base64,${base64}`;
+}
+
 const signToken = (user) => {
   const payload = { user: { id: user._id } };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -66,10 +109,14 @@ exports.getProfileById = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    // Expect multipart form-data (Cloudinary handled elsewhere in original code)
+    const userId = req.user.id;
+
+    // Start from request body (strings) and normalize list fields
     const fields = { ...req.body };
-    // Split comma-separated arrays to arrays
-    const listy = ['interests','skills','education','workExperience','languages','connections','badges','recentActivity','preferredTopics'];
+    const listy = [
+      'interests','skills','education','workExperience',
+      'languages','connections','badges','recentActivity','preferredTopics'
+    ];
     listy.forEach(k => {
       if (fields[k] && typeof fields[k] === 'string') {
         fields[k] = fields[k].split(',').map(s => s.trim()).filter(Boolean);
@@ -79,12 +126,41 @@ exports.updateProfile = async (req, res) => {
     if (typeof fields.genderPrivacy === 'string') {
       fields.genderPrivacy = fields.genderPrivacy === 'true';
     }
-    if (req.file && req.file.path) {
-      fields.profilePicture = req.file.path;
+
+    // Load current user to access previous avatar (if any)
+    const current = await User.findById(userId).select('profilePicture profilePicturePublicId');
+    if (!current) return res.status(404).json({ message: 'User not found' });
+
+    // If a new file is present, upload to Cloudinary
+    if (req.file) {
+      if (req.file.buffer) {
+        const dataURI = bufferToDataURI(req.file.buffer, req.file.mimetype);
+        const result = await cloudinary.uploader.upload(dataURI, {
+          folder: 'knowsphere_profiles',
+          resource_type: 'image',
+          public_id: `${userId}-${Date.now()}`,
+          overwrite: true,
+        });
+        fields.profilePicture = result.secure_url;
+        fields.profilePicturePublicId = result.public_id;
+
+        // Best-effort cleanup of old image
+        if (current.profilePicturePublicId) {
+          cloudinary.uploader.destroy(current.profilePicturePublicId).catch(() => {});
+        } else if (current.profilePicture && isCloudinaryUrl(current.profilePicture)) {
+          const oldId = getPublicIdFromUrl(current.profilePicture);
+          if (oldId) cloudinary.uploader.destroy(oldId).catch(() => {});
+        }
+      } else if (req.file.path) {
+        // Fallback: if some environments still set a disk path
+        fields.profilePicture = req.file.path;
+      }
     }
-    const updated = await User.findByIdAndUpdate(req.user.id, fields, { new: true }).select('-password');
+
+    const updated = await User.findByIdAndUpdate(userId, fields, { new: true }).select('-password');
     return res.json(updated);
   } catch (e) {
+    console.error('updateProfile error:', e);
     return res.status(500).json({ message: 'Server error' });
   }
 };
@@ -109,7 +185,20 @@ exports.changePassword = async (req, res) => {
 
 exports.deleteProfile = async (req, res) => {
   try {
-    await User.deleteOne({ _id: req.user.id });
+    const userId = req.user.id;
+
+    const user = await User.findById(userId).select('profilePicture profilePicturePublicId');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Best-effort Cloudinary cleanup before deletion
+    if (user.profilePicturePublicId) {
+      await cloudinary.uploader.destroy(user.profilePicturePublicId).catch(() => {});
+    } else if (user.profilePicture && isCloudinaryUrl(user.profilePicture)) {
+      const publicId = getPublicIdFromUrl(user.profilePicture);
+      if (publicId) await cloudinary.uploader.destroy(publicId).catch(() => {});
+    }
+
+    await User.deleteOne({ _id: userId });
     return res.json({ message: 'Profile deleted' });
   } catch (e) {
     return res.status(500).json({ message: 'Server error' });

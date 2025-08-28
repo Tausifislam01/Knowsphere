@@ -1,114 +1,62 @@
-const mongoose = require('mongoose');
-const Insight = require('./models/Insight');
-const { callHuggingFaceAPI } = require('./config/ai');
+// operation.js
+// One-time migration script to backfill profilePicturePublicId for existing users.
+// Run with:  node operation.js
+
 require('dotenv').config();
+const mongoose = require('mongoose');
+const User = require('./models/User');
 
-const connectDB = async () => {
+// --- helper: extract public_id from Cloudinary URL ---
+function getPublicIdFromUrl(url) {
   try {
-    if (!process.env.MONGO_URI) {
-      throw new Error('MONGO_URI is not defined in .env file');
-    }
-
-    await mongoose.connect(process.env.MONGO_URI, {});
-
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    process.exit(1);
+    if (!url) return null;
+    const u = new URL(url);
+    if (!u.hostname.endsWith('res.cloudinary.com')) return null;
+    const idx = u.pathname.indexOf('/upload/');
+    if (idx === -1) return null;
+    let rest = u.pathname.slice(idx + '/upload/'.length);
+    rest = rest.replace(/^v\d+\//, ''); // strip version prefix like v1712345678/
+    const lastDot = rest.lastIndexOf('.');
+    if (lastDot > -1) rest = rest.slice(0, lastDot);
+    return rest.replace(/^\/+|\/+$/g, '');
+  } catch {
+    return null;
   }
-};
+}
 
-const checkAndFixInsights = async () => {
+async function main() {
   try {
-    await connectDB();
-    const insights = await Insight.find({});
+    await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
 
+    console.log('Connected to MongoDB');
 
-    if (insights.length === 0) {
-      console.warn('No insights found in the database');
-      process.exit(0);
-    }
+    const users = await User.find({
+      profilePicture: { $exists: true, $ne: null },
+      $or: [{ profilePicturePublicId: { $exists: false } }, { profilePicturePublicId: null }],
+    });
 
-    for (const insight of insights) {
+    console.log(`Found ${users.length} users to update...`);
 
-      let needsUpdate = false;
-      const updates = {};
-
-      // Check title
-      if (!insight.title || typeof insight.title !== 'string' || insight.title.trim() === '') {
-        console.warn(`Insight ${insight._id} has invalid title: ${insight.title}`);
-        updates.title = 'Untitled Insight';
-        needsUpdate = true;
-      }
-
-      // Check body
-      if (!insight.body || typeof insight.body !== 'string' || insight.body.trim() === '') {
-        console.warn(`Insight ${insight._id} has invalid body: ${insight.body}`);
-        updates.body = 'No content provided';
-        needsUpdate = true;
-      }
-
-      // Check userId
-      if (!insight.userId) {
-        console.warn(`Insight ${insight._id} has missing userId`);
-        // Note: You'll need to decide how to handle missing userId (e.g., skip or assign a default user)
-        continue; // Skip for now to avoid errors
-      }
-
-      // Check visibility
-      if (!insight.visibility || !['public', 'private'].includes(insight.visibility)) {
-        console.warn(`Insight ${insight._id} has invalid visibility: ${insight.visibility}`);
-        updates.visibility = 'public';
-        needsUpdate = true;
-      }
-
-      // Check isHidden
-      if (typeof insight.isHidden !== 'boolean') {
-        console.warn(`Insight ${insight._id} has invalid isHidden: ${insight.isHidden}`);
-        updates.isHidden = false;
-        needsUpdate = true;
-      }
-
-      // Check tags
-      if (!Array.isArray(insight.tags)) {
-        console.warn(`Insight ${insight._id} has invalid tags: ${insight.tags}`);
-        updates.tags = [];
-        needsUpdate = true;
-      }
-
-      // Check embedding
-      if (!insight.embedding || !Array.isArray(insight.embedding) || insight.embedding.length === 0) {
-
-        const content = `${insight.title || 'Untitled'} ${insight.body || 'No content'}`.trim();
-        try {
-          const result = await callHuggingFaceAPI('sentence-transformers/all-MiniLM-L6-v2', { inputs: content });
-          updates.embedding = result[0]; // Assuming result[0] is the embedding vector
-          needsUpdate = true;
-        } catch (error) {
-          console.error(`Failed to generate embedding for insight ${insight._id}:`, error.message);
-          updates.embedding = [];
-        }
-      }
-
-      // Apply updates if needed
-      if (needsUpdate) {
-        try {
-          await Insight.updateOne({ _id: insight._id }, { $set: updates });
-
-        } catch (error) {
-          console.error(`Failed to update insight ${insight._id}:`, error.message);
-        }
+    for (const user of users) {
+      const pid = getPublicIdFromUrl(user.profilePicture);
+      if (pid) {
+        user.profilePicturePublicId = pid;
+        await user.save();
+        console.log(`✔ Updated ${user.username || user._id} with public_id: ${pid}`);
       } else {
-
+        console.log(`⚠ Skipped ${user.username || user._id}, no valid Cloudinary URL`);
       }
     }
 
-
+    console.log('Migration complete.');
     process.exit(0);
-  } catch (error) {
-    console.error('Error in checkAndFixInsights:', error);
+  } catch (err) {
+    console.error('Migration failed:', err);
     process.exit(1);
   }
-};
+}
 
-// Run the script
-checkAndFixInsights();
+main();

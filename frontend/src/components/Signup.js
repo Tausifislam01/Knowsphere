@@ -36,7 +36,7 @@ function Signup() {
     e.preventDefault();
     setError('');
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
     try {
       const response = await fetch('http://localhost:5000/api/auth/signup', {
@@ -48,8 +48,10 @@ function Signup() {
       });
       const data = await response.json();
       if (response.ok) {
-        localStorage.setItem('token', data.token);
-        navigate('/');
+        // ✅ Redirect to login (no token saved here)
+        navigate('/login', {
+          state: { fromSignup: true, msg: 'Account created successfully. Please log in.' },
+        });
       } else {
         setError(data.message || 'Failed to sign up');
       }
@@ -72,7 +74,7 @@ function Signup() {
                   Create Account
                 </h2>
               </div>
-              
+
               <div className="card-body p-4 p-md-5">
                 {error && (
                   <div className="alert alert-danger d-flex align-items-center" role="alert">
@@ -83,7 +85,9 @@ function Signup() {
 
                 <form onSubmit={handleSubmit}>
                   <div className="mb-4">
-                    <label className="form-label fw-semibold">Username <span className="text-danger">*</span></label>
+                    <label className="form-label fw-semibold">
+                      Username <span className="text-danger">*</span>
+                    </label>
                     <div className="input-group">
                       <span className="input-group-text">
                         <i className="bi bi-person-fill"></i>
@@ -101,7 +105,9 @@ function Signup() {
                   </div>
 
                   <div className="mb-4">
-                    <label className="form-label fw-semibold">Email <span className="text-danger">*</span></label>
+                    <label className="form-label fw-semibold">
+                      Email <span className="text-danger">*</span>
+                    </label>
                     <div className="input-group">
                       <span className="input-group-text">
                         <i className="bi bi-envelope-fill"></i>
@@ -119,7 +125,9 @@ function Signup() {
                   </div>
 
                   <div className="mb-4">
-                    <label className="form-label fw-semibold">Password <span className="text-danger">*</span></label>
+                    <label className="form-label fw-semibold">
+                      Password <span className="text-danger">*</span>
+                    </label>
                     <div className="input-group">
                       <span className="input-group-text">
                         <i className="bi bi-lock-fill"></i>
@@ -144,7 +152,11 @@ function Signup() {
                     >
                       {isLoading ? (
                         <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          <span
+                            className="spinner-border spinner-border-sm me-2"
+                            role="status"
+                            aria-hidden="true"
+                          ></span>
                           Signing up...
                         </>
                       ) : (
