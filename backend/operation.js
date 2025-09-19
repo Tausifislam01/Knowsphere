@@ -31,27 +31,27 @@ async function main() {
       useUnifiedTopology: true,
     });
 
-    console.log('Connected to MongoDB');
+  // console.log('Connected to MongoDB');
 
     const users = await User.find({
       profilePicture: { $exists: true, $ne: null },
       $or: [{ profilePicturePublicId: { $exists: false } }, { profilePicturePublicId: null }],
     });
 
-    console.log(`Found ${users.length} users to update...`);
+  // console.log(`Found ${users.length} users to update...`);
 
     for (const user of users) {
       const pid = getPublicIdFromUrl(user.profilePicture);
       if (pid) {
         user.profilePicturePublicId = pid;
         await user.save();
-        console.log(`✔ Updated ${user.username || user._id} with public_id: ${pid}`);
+  // console.log(`✔ Updated ${user.username || user._id} with public_id: ${pid}`);
       } else {
-        console.log(`⚠ Skipped ${user.username || user._id}, no valid Cloudinary URL`);
+  // console.log(`⚠ Skipped ${user.username || user._id}, no valid Cloudinary URL`);
       }
     }
 
-    console.log('Migration complete.');
+  // console.log('Migration complete.');
     process.exit(0);
   } catch (err) {
     console.error('Migration failed:', err);

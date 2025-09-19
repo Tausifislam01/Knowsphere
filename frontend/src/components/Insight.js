@@ -10,7 +10,11 @@ import ReportButton from './ReportButton';
 import { getRelatedInsights } from '../utils/api';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 
-const BACKEND_URL = 'http://localhost:5000';
+
+const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+const API_URL = `${API_ORIGIN}/api`;
+
+const BACKEND_URL = process.env.REACT_APP_API_URL || window.location.origin;
 const socket = io(BACKEND_URL, {
   auth: { token: localStorage.getItem('token') },
 });
@@ -44,7 +48,7 @@ function Insight({ insight, currentUser, onEdit, onDelete, showRelated = true })
     // Real-time vote updates
     socket.on('insightVoted', ({ insightId }) => {
       if (insightId === insight._id) {
-        fetch(`http://localhost:5000/api/insights/${insight._id}`, {
+        fetch(`${API_URL}/insights/${insight._id}`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -96,7 +100,7 @@ function Insight({ insight, currentUser, onEdit, onDelete, showRelated = true })
   const handleVote = async (voteType) => {
     if (!insight) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/insights/${insight._id}/vote`, {
+      const response = await fetch(`${API_URL}/insights/${insight._id}/vote`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,7 +139,7 @@ function Insight({ insight, currentUser, onEdit, onDelete, showRelated = true })
   const handleHide = async () => {
     if (!insight) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/insights/${insight._id}/hide`, {
+      const response = await fetch(`${API_URL}/insights/${insight._id}/hide`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });

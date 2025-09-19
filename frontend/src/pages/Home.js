@@ -1,3 +1,4 @@
+import { API_URL } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -73,7 +74,7 @@ function Home({ currentUser }) {
             ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
             : { 'Content-Type': 'application/json' };
 
-          const data = await fetchFrom(`http://localhost:5000/api/insights/${id}`, headers);
+          const data = await fetchFrom(`${API_URL}/insights/${id}`, headers);
           setSingleInsight(data);
           setInsights([data]);
         } catch (err) {
@@ -101,7 +102,7 @@ function Home({ currentUser }) {
         let url;
 
         if (activeTab === 'following' && token) {
-          url = 'http://localhost:5000/api/insights/followed';
+          url = `${API_URL}/insights/followed`;
           const data = await fetchFrom(url, headers);
           setSingleInsight(null);
           setInsights(Array.isArray(data) ? data : []);
@@ -122,9 +123,9 @@ function Home({ currentUser }) {
             const queryParams = [];
             if (cleanSearchTerm) queryParams.push(`q=${encodeURIComponent(cleanSearchTerm)}`);
             if (cleanTag) queryParams.push(`tag=${encodeURIComponent(cleanTag)}`);
-            url = `http://localhost:5000/api/insights/search?${queryParams.join('&')}`;
+            url = `${API_URL}/insights/search?${queryParams.join('&')}`;
           } else {
-            url = 'http://localhost:5000/api/insights/public';
+            url = `${API_URL}/insights/public`;
           }
         }
 
@@ -156,7 +157,7 @@ function Home({ currentUser }) {
     if (!window.confirm('Are you sure you want to delete this insight?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/insights/${idToDelete}`, {
+  const response = await fetch(`${API_URL}/insights/${idToDelete}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 
-const BACKEND_URL = 'http://localhost:5000';
+
+const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+const API_URL = `${API_ORIGIN}/api`;
+
+const BACKEND_URL = process.env.REACT_APP_API_URL || window.location.origin;
 const socket = io(BACKEND_URL, {
   auth: { token: localStorage.getItem('token') },
 });
@@ -17,7 +21,7 @@ function VoteButtons({ insightId, initialUpvotes, initialDownvotes }) {
     socket.on('insightVoted', ({ insightId: votedInsightId, voteType, userId: voterId }) => {
       if (votedInsightId === insightId) {
         // Fetch updated insight to ensure accurate vote counts
-        fetch(`http://localhost:5000/api/insights/${insightId}`, {
+        fetch(`${API_URL}/insights/${insightId}`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -42,7 +46,7 @@ function VoteButtons({ insightId, initialUpvotes, initialDownvotes }) {
   const handleVote = async (voteType) => {
     setError('');
     try {
-      const response = await fetch(`http://localhost:5000/api/insights/${insightId}/vote`, {
+      const response = await fetch(`${API_URL}/insights/${insightId}/vote`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

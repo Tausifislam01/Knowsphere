@@ -1,3 +1,4 @@
+import { API_URL } from '../utils/api';
 
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -14,7 +15,7 @@ useEffect(() => {
     const fetchData = async () => {
     try {
         // Fetch current user
-        const userResponse = await fetch('http://localhost:5000/api/auth/profile', {
+    const userResponse = await fetch(`${API_URL}/auth/profile`, {
         headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -26,7 +27,7 @@ useEffect(() => {
         setCurrentUser(userData);
 
         // Fetch all users
-        const usersResponse = await fetch('http://localhost:5000/api/auth/users', {
+    const usersResponse = await fetch(`${API_URL}/auth/users`, {
         headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -38,7 +39,7 @@ useEffect(() => {
         setUsers(usersData);
 
         // Fetch all tags
-        const insightsResponse = await fetch('http://localhost:5000/api/insights/public');
+    const insightsResponse = await fetch(`${API_URL}/insights/public`);
         if (!insightsResponse.ok) {
         throw new Error('Failed to fetch tags');
         }

@@ -1,3 +1,4 @@
+import { API_URL } from '../utils/api';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { searchUsers } from '../utils/api';
@@ -53,7 +54,7 @@ export default function UsersSearch() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    fetch('http://localhost:5000/api/auth/profile', {
+  fetch(`${API_URL}/auth/profile`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : null))

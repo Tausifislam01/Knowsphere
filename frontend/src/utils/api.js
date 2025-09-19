@@ -1,6 +1,6 @@
 // frontend/src/utils/api.js
-const API_ORIGIN = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const API_URL = `${API_ORIGIN}/api`;
+export const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+export const API_URL = `${API_ORIGIN}/api`;
 
 /* ---------------- Helpers ---------------- */
 

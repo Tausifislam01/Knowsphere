@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { io } from 'socket.io-client';
 
-const BACKEND_URL = 'http://localhost:5000';
+
+const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+const API_URL = `${API_ORIGIN}/api`;
+const BACKEND_URL = process.env.REACT_APP_API_URL || window.location.origin;
 const socket = io(BACKEND_URL, {
   auth: { token: localStorage.getItem('token') },
 });
@@ -14,7 +17,7 @@ function BookmarkButton({ insightId, className }) {
   useEffect(() => {
     const checkBookmark = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/bookmarks', {
+        const response = await fetch(`${API_URL}/bookmarks`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -56,8 +59,8 @@ function BookmarkButton({ insightId, className }) {
     try {
       const method = isBookmarked ? 'DELETE' : 'POST';
       const url = isBookmarked
-        ? `http://localhost:5000/api/bookmarks/${insightId}`
-        : 'http://localhost:5000/api/bookmarks';
+        ? `${API_URL}/bookmarks/${insightId}`
+        : `${API_URL}/bookmarks`;
       const response = await fetch(url, {
         method,
         headers: {

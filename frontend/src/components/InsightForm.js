@@ -3,6 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { suggestTags } from '../utils/api';
 
+
+const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+const API_URL = `${API_ORIGIN}/api`;
+
 function InsightForm({ mode = 'create' }) {
   const [formData, setFormData] = useState({
     title: '',
@@ -29,7 +33,7 @@ function InsightForm({ mode = 'create' }) {
       const fetchInsight = async () => {
         setIsLoading(true);
         try {
-          const response = await fetch(`http://localhost:5000/api/insights/${insightId}`, {
+          const response = await fetch(`${API_URL}/insights/${insightId}`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -119,7 +123,7 @@ function InsightForm({ mode = 'create' }) {
 
     const tagsArray = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     try {
-      const response = await fetch(`http://localhost:5000/api/insights`, {
+      const response = await fetch(`${API_URL}/insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

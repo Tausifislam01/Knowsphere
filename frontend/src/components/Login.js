@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 
+
+const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+const API_URL = `${API_ORIGIN}/api`;
+
 function Login({ onLogin }) {
   const [formData, setFormData] = useState({
     username: '',
@@ -34,7 +38,7 @@ function Login({ onLogin }) {
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

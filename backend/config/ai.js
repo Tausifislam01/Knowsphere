@@ -1,40 +1,55 @@
+// backend/config/ai.js
+// Safe HTTP client for Hugging Face (or similar) with sane timeouts & lightweight retry.
 const axios = require('axios');
-require('dotenv').config();
+const { env } = require('./env');
 
-const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-const HUGGINGFACE_API_URL = 'https://api-inference.huggingface.co';
+// base axios with timeout and no secret leakage
+const hf = axios.create({
+  baseURL: 'https://api-inference.huggingface.co',
+  timeout: 10_000, // 10s
+  headers: env.HUGGINGFACE_API_KEY ? {
+    Authorization: `Bearer ${env.HUGGINGFACE_API_KEY}`,
+  } : {},
+});
 
-const callHuggingFaceAPI = async (model, payload, task = 'models') => {
-  try {
-    if (!HUGGINGFACE_API_KEY) {
-      throw new Error('HUGGINGFACE_API_KEY is not defined in .env file');
-    }
-    let endpoint = task === 'feature-extraction'
-      ? `pipeline/feature-extraction/${model}`
-      : `${task}/${model}`;
+// naive exponential backoff for 429/503/timeouts up to 2 retries
+hf.interceptors.response.use(
+  r => r,
+  async (error) => {
+    const cfg = error.config || {};
+    const status = error.response?.status;
 
-    console.log(`Calling Hugging Face API: ${HUGGINGFACE_API_URL}/${endpoint}`);
-    const response = await axios.post(
-      `${HUGGINGFACE_API_URL}/${endpoint}`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    console.log(`API response for ${model}:`, response.data);
-    return response.data;
-  } catch (error) {
-    if (error.response?.status === 429) {
-      throw new Error('Rate limit reached. Please check your Hugging Face free tier quota or upgrade to PRO.');
+    // Only retry idempotent GET/HEAD; if you use POST for inference, skip retries or gate via cfg.idempotent
+    const method = (cfg.method || 'get').toLowerCase();
+    const idempotent = method === 'get' || cfg.idempotent === true;
+
+    cfg.__retryCount = cfg.__retryCount || 0;
+    const shouldRetry =
+      idempotent &&
+      cfg.__retryCount < 2 &&
+      (status === 429 || status === 503 || error.code === 'ECONNABORTED');
+
+    if (!shouldRetry) {
+      return Promise.reject(error);
     }
-    if (error.response?.status === 404) {
-      throw new Error(`Model ${model} not found on Hugging Face Inference API.`);
-    }
-    throw new Error(`Failed to process AI request: ${error.message}`);
+
+    cfg.__retryCount += 1;
+    const delayMs = 300 * (2 ** (cfg.__retryCount - 1)); // 300ms, 600ms
+    await new Promise(res => setTimeout(res, delayMs));
+    return hf(cfg);
   }
-};
+);
 
-module.exports = { callHuggingFaceAPI };
+// Helper to call an inference endpoint with graceful fallback
+async function safeHfGet(url, params = {}) {
+  try {
+    const { data } = await hf.get(url, { params });
+    return { ok: true, data };
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[hf] request failed:', e.response?.status || e.code || e.message);
+    return { ok: false, error: 'External AI service unavailable. Proceeding without suggestions.' };
+  }
+}
+
+module.exports = { hf, safeHfGet };

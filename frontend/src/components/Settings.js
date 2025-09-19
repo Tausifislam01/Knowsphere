@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+
+const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+const API_URL = `${API_ORIGIN}/api`;
+
 function Settings() {
   const [formData, setFormData] = useState({
     currentPassword: '',
@@ -47,7 +51,7 @@ function Settings() {
     
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/auth/change-password', {
+      const response = await fetch(`${API_URL}/auth/change-password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -76,7 +80,7 @@ function Settings() {
   const handleDeleteProfile = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/auth/delete', {
+      const response = await fetch(`${API_URL}/auth/delete`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

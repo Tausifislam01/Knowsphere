@@ -4,6 +4,9 @@ import { toast } from 'react-toastify';
 import Insight from './Insight';
 import FollowButton from './FollowButton';
 
+const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+const API_URL = `${API_ORIGIN}/api`;
+
 function TagInsights({ currentUser }) {
   const { tag } = useParams();
   const [insights, setInsights] = useState([]);
@@ -16,7 +19,7 @@ function TagInsights({ currentUser }) {
       setError(null);
       try {
         console.log('Fetching insights for tag:', tag);
-        const response = await fetch(`http://localhost:5000/api/insights/tags/${encodeURIComponent(tag)}`, {
+        const response = await fetch(`${API_URL}/insights/tags/${encodeURIComponent(tag)}`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json',

@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// --- Cloudinary (MVC: business logic in controller) ---
+// --- Cloudinary  ---
 const { v2: cloudinary } = require('cloudinary');
 
 cloudinary.config({
@@ -12,7 +12,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// --- local helpers (kept inside controller) ---
+// --- local helpers  ---
 function isCloudinaryUrl(url) {
   if (!url) return false;
   try {

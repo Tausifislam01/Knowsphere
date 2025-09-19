@@ -5,7 +5,7 @@ import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import ReportButton from './ReportButton';
 
-const BACKEND_URL = 'http://localhost:5000';
+const BACKEND_URL = process.env.REACT_APP_API_URL || window.location.origin;
 const socket = io(BACKEND_URL, {
   auth: { token: localStorage.getItem('token') },
 });

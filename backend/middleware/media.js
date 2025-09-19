@@ -1,25 +1,21 @@
-// backend/middleware/media.js
-// Thin middleware: Multer (memory) + validation. No Cloudinary logic here.
-
+'use strict';
 const multer = require('multer');
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const storage = multer.memoryStorage();
+const ALLOWED = new Set(['image/jpeg','image/png','image/webp','image/gif']);
 
+function fileFilter(req, file, cb) {
+  if (ALLOWED.has(file.mimetype)) return cb(null, true);
+  return cb(new Error('Only image uploads are allowed'));
+}
+
+const MAX_SIZE_MB = parseInt(process.env.UPLOAD_MAX_MB || '5', 10);
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_FILE_BYTES },
-  fileFilter: (req, file, cb) => {
-    if (!ALLOWED_MIME.has(file.mimetype)) {
-      const err = new multer.MulterError('LIMIT_UNEXPECTED_FILE');
-      err.message = 'Only JPG, PNG, or WebP images are allowed.';
-      return cb(err);
-    }
-    cb(null, true);
-  },
+  storage,
+  fileFilter,
+  limits: { fileSize: MAX_SIZE_MB * 1024 * 1024 },
 });
 
-// Matches your UI key name <input name="profilePicture" .../>
 const uploadAvatar = upload.single('profilePicture');
 
 module.exports = { uploadAvatar };

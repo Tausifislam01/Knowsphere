@@ -1,3 +1,4 @@
+import { API_URL } from './utils/api';
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
@@ -27,7 +28,7 @@ function App() {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/auth/profile', {
+  const response = await fetch(`${API_URL}/auth/profile`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

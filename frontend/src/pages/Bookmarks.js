@@ -1,3 +1,4 @@
+import { API_URL } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -13,7 +14,7 @@ function Bookmarks({ currentUser }) {
     const fetchBookmarks = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('http://localhost:5000/api/bookmarks', {
+  const response = await fetch(`${API_URL}/bookmarks`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -48,7 +49,7 @@ function Bookmarks({ currentUser }) {
     if (!window.confirm('Are you sure you want to delete this insight?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/insights/${insightId}`, {
+  const response = await fetch(`${API_URL}/insights/${insightId}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

@@ -5,6 +5,10 @@ import { toast } from 'react-toastify';
 import FollowButton from './FollowButton';
 import Insight from './Insight';
 
+
+const API_ORIGIN = process.env.REACT_APP_API_URL || window.location.origin;
+const API_URL = `${API_ORIGIN}/api`;
+
 function Profile({ currentUser }) {
   const navigate = useNavigate();
   const { userId: paramUserId } = useParams();
@@ -44,8 +48,8 @@ function Profile({ currentUser }) {
       setError('');
       try {
         const url = paramUserId
-          ? `http://localhost:5000/api/auth/profile/${paramUserId}`
-          : `http://localhost:5000/api/auth/profile`;
+          ? `${API_URL}/auth/profile/${paramUserId}`
+          : `${API_URL}/auth/profile`;
         const res = await fetch(url, { headers: getAuthHeaders() });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -70,7 +74,7 @@ function Profile({ currentUser }) {
       setInsightsLoading(true);
       try {
         const res = await fetch(
-          `http://localhost:5000/api/insights/user/${headerUser._id}`,
+          `${API_URL}/insights/user/${headerUser._id}`,
           { headers: getAuthHeaders() }
         );
         if (!res.ok) {
@@ -99,7 +103,7 @@ function Profile({ currentUser }) {
         continue;
       }
       try {
-        const res = await fetch(`http://localhost:5000/api/auth/profile/${item}`, { headers: getAuthHeaders() });
+        const res = await fetch(`${API_URL}/auth/profile/${item}`, { headers: getAuthHeaders() });
         if (res.ok) {
           results.push(await res.json());
         }

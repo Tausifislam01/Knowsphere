@@ -1,16 +1,28 @@
 # Node.js
 node_modules/
-npm-debug.log
-yarn-error.log
-yarn.lock
-**/package-lock.json
+npm-debug.log*
+yarn-error.log*
+# Choose ONE lockfile strategy:
+# If using npm, KEEP package-lock.json (do NOT ignore it)
+# If using yarn, keep yarn.lock and ignore package-lock.json
+# yarn.lock
+# **/package-lock.json
 
 # Environment variables
 .env*
+*.local
 
 # Build outputs
 frontend/build/
 backend/dist/
+
+# Coverage / test artifacts
+coverage/
+.nyc_output/
+
+# Tooling caches
+.eslintcache
+*.cache
 
 # IDE and editor files
 .vscode/
@@ -36,7 +48,13 @@ backend/test-mongo.js
 # Temporary files
 *.tmp
 *.bak
-*.cache
 
+# Deployment / platform
+.vercel/
+.netlify/
 
+# Local uploads or temp storage (if you ever add)
+uploads/
+
+# Secrets / keys
 knowsphere-drive-key.json
