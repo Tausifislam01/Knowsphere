@@ -52,10 +52,13 @@ function Signup() {
       });
       const data = await response.json();
       if (response.ok) {
-        // ✅ Redirect to login (no token saved here)
         navigate('/login', {
-          state: { fromSignup: true, msg: 'Account created successfully. Please log in.' },
-        });
+          state: {
+            fromSignup: true,
+            msg: 'Account created successfully. Please verify your email before logging in.',
+          },
+        })
+
       } else {
         setError(data.message || 'Failed to sign up');
       }

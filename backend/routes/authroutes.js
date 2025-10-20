@@ -3,14 +3,33 @@ const express = require('express');
 const router = express.Router();
 const { auth, adminAuth } = require('../middleware/auth');
 const Auth = require('../controllers/auth.controller');
+const rateLimit = require('express-rate-limit');
+
 
 // Multer-only middleware (no Cloudinary logic here)
 const media = require('../middleware/media');
 
+
+// rate limits for email flows (prevents spam)
+const emailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour window
+  max: 5,                    // limit each IP to 5 requests/hour on these endpoints
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
 // Basic auth
 router.post('/signup', Auth.signup);
 router.post('/login', Auth.login);
-router.post('/forgot-password', Auth.forgotPassword);
+
+
+// email verification + password reset
+router.post('/resend-verification', auth, emailLimiter, Auth.resendVerification);
+router.get('/verify-email/:token', Auth.verifyEmail);
+router.post('/forgot-password', emailLimiter, Auth.forgotPassword); // replace your old line if present
+router.post('/reset-password/:token', Auth.resetPassword);
+
 
 // Profile
 router.get('/profile', auth, Auth.getProfile);

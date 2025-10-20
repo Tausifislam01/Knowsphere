@@ -35,6 +35,13 @@ const UserSchema = new mongoose.Schema({
   violations: { type: Number, default: 0 },
   bannedUntil: { type: Date, default: null },
 
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationTokenHash: { type: String, default: null },
+  emailVerificationExpires: { type: Date, default: null },
+
+  passwordResetTokenHash: { type: String, default: null },
+  passwordResetExpires: { type: Date, default: null },
+
   createdAt: { type: Date, default: Date.now },
 });
 

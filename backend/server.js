@@ -75,6 +75,13 @@ app.use(helmet({
 }));
 
 // CORS with allowlist (HTTP)
+app.use((req, res, next) => {
+  if (req.headers.origin) {
+    console.log('[CORS] Origin:', req.headers.origin, '->', req.method, req.originalUrl);
+  }
+  next();
+});
+
 app.use(cors({
   origin(origin, callback) {
     if (!origin) return callback(null, true); // same-origin / curl
@@ -290,16 +297,28 @@ server.listen(port, () => {
   // console.log(`Server running on port ${port} (${env.NODE_ENV})`);
 });
 
-function shutdown(sig) {
+async function shutdown(sig) {
   // console.log(`${sig} received — shutting down gracefully`);
-  server.close(() => {
-    mongoose.connection.close(false, () => {
-  // console.log('HTTP server closed. Mongo connection closed.');
+  try {
+    server.close(async () => {
+      try {
+        // v7+: returns a Promise; no callback allowed
+        await mongoose.connection.close(false);
+      } catch (e) {
+        // optional log
+      }
       process.exit(0);
     });
-  });
-  setTimeout(() => process.exit(1), 10_000).unref();
+
+    // safety timer
+    setTimeout(() => process.exit(1), 10_000).unref();
+  } catch (e) {
+    try { await mongoose.connection.close(false); } catch {}
+    process.exit(1);
+  }
 }
+
 ['SIGTERM', 'SIGINT'].forEach(sig => process.on(sig, () => shutdown(sig)));
+
 
 module.exports = { app, server, io };

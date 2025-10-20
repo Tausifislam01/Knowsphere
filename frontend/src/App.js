@@ -17,6 +17,9 @@ import UsersSearch from './pages/UsersSearch';
 import 'react-toastify/dist/ReactToastify.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './style.css';
+import VerifyEmail from './pages/VerifyEmail';
+import ResetPassword from './pages/ResetPassword';
+import ForgotPassword from './components/ForgotPassword';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -108,6 +111,11 @@ function App() {
               </div>
             }
           />
+
+          <Route path="/verify" element={<VerifyEmail />} />    
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+
         </Routes>
 
         <ToastContainer

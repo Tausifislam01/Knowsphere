@@ -3,6 +3,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+const crypto = require('crypto'); // (you already have this if you pasted the last draft)
+const { sendEmail } = require('../config/email');
+const { template: verifyTpl } = require('../emails/verifyEmail');
+const { template: resetTpl } = require('../emails/resetPassword');
+
+
 // --- Cloudinary  ---
 const { v2: cloudinary } = require('cloudinary');
 
@@ -51,38 +57,153 @@ const signToken = (user) => {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
+// hash tokens at rest
+function makeToken() {
+  const raw = crypto.randomBytes(32).toString('hex');
+  const hash = crypto.createHash('sha256').update(raw).digest('hex');
+  return { raw, hash };
+}
+function minutesFromNow(min) {
+  return new Date(Date.now() + min * 60 * 1000);
+}
+
+
 exports.signup = async (req, res) => {
   try {
     const { username, email, password } = req.body;
     if (!username || !email || !password) {
       return res.status(400).json({ message: 'username, email and password are required' });
     }
-    const exists = await User.findOne({ $or: [{ username }, { email }] });
-    if (exists) return res.status(400).json({ message: 'Username or email already in use' });
 
+    // Check uniqueness on username OR email
+    const exists = await User.findOne({ $or: [{ username }, { email }] });
+    if (exists) {
+      return res.status(400).json({ message: 'Username or email already in use' });
+    }
+
+    // Create the user (unverified by default)
     const hash = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, password: hash });
-    const token = signToken(user);
-    return res.status(201).json({ token, user: { _id: user._id, username: user.username, isAdmin: user.isAdmin } });
+    const user = await User.create({
+      username,
+      email,
+      password: hash,
+      emailVerified: false,
+    });
+
+    // --- Send verification email ---
+    const { raw, hash: tokenHash } = makeToken();              // raw token for link, hash for DB
+    user.emailVerificationTokenHash = tokenHash;
+    user.emailVerificationExpires = minutesFromNow(30);         // 30-minute expiry
+    await user.save();
+
+    const verifyLink = `${process.env.APP_BASE_URL}/verify?token=${raw}`;
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify your email - KnowSphere',
+      html: verifyTpl({ link: verifyLink, username: user.username }),
+    });
+
+    // Don’t auto-login; prompt verification
+    return res.status(201).json({
+      message: 'Account created. Please verify your email.',
+    });
   } catch (e) {
+    console.error('signup error:', e);
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ message: 'username and password are required' });
+    if (!username || !password) {
+      return res.status(400).json({ message: 'username and password are required' });
+    }
+
+    // find user by username and include password for comparison
     const user = await User.findOne({ username }).select('+password');
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // compare provided password with stored hash
     const ok = await bcrypt.compare(password, user.password || '');
-    if (!ok) return res.status(400).json({ message: 'Invalid credentials' });
+    if (!ok) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // ⛔ block login if the account hasn’t been verified
+    if (!user.emailVerified) {
+      return res
+        .status(403)
+        .json({ message: 'Please verify your email before logging in.' });
+    }
+
+    // generate JWT token for verified user
     const token = signToken(user);
-    return res.json({ token, user: { _id: user._id, username: user.username, isAdmin: user.isAdmin } });
+    return res.json({
+      token,
+      user: {
+        _id: user._id,
+        username: user.username,
+        isAdmin: user.isAdmin,
+      },
+    });
+  } catch (e) {
+    console.error('login error:', e);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+exports.resendVerification = async (req, res) => {
+  try {
+    const me = await User.findById(req.user.id);
+    if (!me) return res.status(404).json({ message: 'User not found' });
+    if (me.emailVerified) return res.status(400).json({ message: 'Email already verified' });
+
+    const { raw, hash } = makeToken();
+    me.emailVerificationTokenHash = hash;
+    me.emailVerificationExpires = minutesFromNow(30);
+    await me.save();
+
+    const verifyLink = `${process.env.APP_BASE_URL}/verify?token=${raw}`;
+    await sendEmail({
+      to: me.email,
+      subject: 'Verify your email - KnowSphere',
+      html: verifyTpl({ link: verifyLink, username: me.username }),
+    });
+
+    return res.json({ message: 'Verification email sent' });
   } catch (e) {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.verifyEmail = async (req, res) => {
+  try {
+    const raw = req.params.token || req.query.token;
+    if (!raw) return res.status(400).json({ message: 'Missing token' });
+    const tokenHash = crypto.createHash('sha256').update(raw).digest('hex');
+
+    const user = await User.findOne({
+      emailVerificationTokenHash: tokenHash,
+      emailVerificationExpires: { $gt: new Date() },
+    });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+
+    user.emailVerified = true;
+    user.emailVerificationTokenHash = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+
+    return res.json({ message: 'Email verified successfully' });
+  } catch (e) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 
 exports.getProfile = async (req, res) => {
   try {
@@ -206,16 +327,56 @@ exports.deleteProfile = async (req, res) => {
 };
 
 exports.forgotPassword = async (req, res) => {
-  // Stub, as in the original project
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: 'Email is required' });
-    // In production: generate token, email user
+
+    const user = await User.findOne({ email });
+    // generic response to avoid email enumeration
+    if (!user) return res.json({ message: 'If this email exists, a reset link will be sent.' });
+
+    const { raw, hash } = makeToken();
+    user.passwordResetTokenHash = hash;
+    user.passwordResetExpires = minutesFromNow(30);
+    await user.save();
+
+    const resetLink = `${process.env.APP_BASE_URL}/reset-password?token=${raw}`;
+    await sendEmail({
+      to: email,
+      subject: 'Reset your password - KnowSphere',
+      html: resetTpl({ link: resetLink, username: user.username }),
+    });
+
     return res.json({ message: 'If this email exists, a reset link will be sent.' });
   } catch (e) {
     return res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params; // POST /reset-password/:token
+    const { newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ message: 'Missing token or newPassword' });
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await User.findOne({
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpires: { $gt: new Date() },
+    }).select('+password');
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpires = null;
+    await user.save();
+
+    return res.json({ message: 'Password reset successful' });
+  } catch (e) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 
 exports.followUser = async (req, res) => {
   try {

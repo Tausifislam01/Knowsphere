@@ -399,3 +399,31 @@ export const voteComment = async (commentId, voteType /* 'upvote' | 'downvote' *
   });
   return handle(res, 'Failed to vote on comment');
 };
+
+
+export const resendVerification = async () => {
+  const token = localStorage.getItem('token') || '';
+  const res = await fetch(`${API_URL}/auth/resend-verification`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
+};
+
+export const forgotPassword = async (email) => {
+  const res = await fetch(`${API_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return res.json();
+};
+
+export const resetPassword = async (token, newPassword) => {
+  const res = await fetch(`${API_URL}/auth/reset-password/${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newPassword }),
+  });
+  return res.json();
+};
