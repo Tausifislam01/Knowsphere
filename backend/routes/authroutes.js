@@ -25,10 +25,10 @@ router.post('/login', Auth.login);
 
 
 // email verification + password reset
-router.post('/resend-verification', auth, emailLimiter, Auth.resendVerification);
-router.get('/verify-email/:token', Auth.verifyEmail);
-router.post('/forgot-password', emailLimiter, Auth.forgotPassword); // replace your old line if present
-router.post('/reset-password/:token', Auth.resetPassword);
+// router.post('/resend-verification', auth, emailLimiter, Auth.resendVerification);
+// router.get('/verify-email/:token', Auth.verifyEmail);
+// router.post('/forgot-password', emailLimiter, Auth.forgotPassword); // replace your old line if present
+// router.post('/reset-password/:token', Auth.resetPassword);
 
 
 // Profile
