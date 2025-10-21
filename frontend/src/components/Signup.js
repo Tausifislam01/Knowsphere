@@ -55,7 +55,7 @@ function Signup() {
         navigate('/login', {
           state: {
             fromSignup: true,
-            msg: 'Account created successfully. Please verify your email before logging in.',
+            msg: 'Account created successfully. email verification i scurrently disabled.',
           },
         })
 
