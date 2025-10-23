@@ -137,13 +137,23 @@ useEffect(() => {
           setIsLoading(false);
           return;
         } else if (activeTab === 'trending') {
-          // pass search and tag to backend so ranking happens on filtered set
-          const data = await getTrendingInsights('7d', 50, searchTerm.trim(), selectedTag.trim());
+          // Build query for backend ranking on a filtered set
+          const params = new URLSearchParams();
+          params.set('period', '7d');
+          params.set('limit', '50');
+          const q = (searchTerm || '').trim();
+          const tag = (selectedTag || '').trim();
+          if (q) params.set('q', q);
+          if (tag) params.set('tag', tag);
+
+          const urlTrending = `${API_URL}/insights/trending?${params.toString()}`;
+          const data = await fetchFrom(urlTrending, headers); // ← uses headers without Authorization for guests
+
           setSingleInsight(null);
           setInsights(Array.isArray(data) ? data : []);
           setIsLoading(false);
           return;
-        } else {
+        }else {
           // 'all' tab or guest user
           const cleanSearchTerm = searchTerm ? searchTerm.trim() : '';
           let cleanTag = selectedTag ? selectedTag.trim() : '';
