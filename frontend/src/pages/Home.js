@@ -18,7 +18,25 @@ function Home({ currentUser }) {
   const [selectedTag, setSelectedTag] = useState('');
 
   // New: tab state (following | trending | all)
-  const [activeTab, setActiveTab] = useState('following');
+const [activeTab, setActiveTab] = useState(
+  (currentUser &&
+    ((currentUser.following?.length || 0) + (currentUser.followedTags?.length || 0) > 0))
+    ? 'following'
+    : 'all'
+);
+
+// keep it in sync if currentUser loads later (logged-in users only)
+useEffect(() => {
+  if (!currentUser) return; // ← do nothing for guests
+
+  const hasFollows =
+    (currentUser.following?.length || 0) +
+      (currentUser.followedTags?.length || 0) > 0;
+
+  setActiveTab(hasFollows ? 'following' : 'all');
+}, [currentUser]);
+
+
 
   // Validate MongoDB ObjectId
   const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
@@ -102,10 +120,20 @@ function Home({ currentUser }) {
         let url;
 
         if (activeTab === 'following' && token) {
-          url = `${API_URL}/insights/followed`;
+          const url = `${API_URL}/insights/followed`;
+          const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
           const data = await fetchFrom(url, headers);
-          setSingleInsight(null);
-          setInsights(Array.isArray(data) ? data : []);
+
+          // Fallback to public feed if the user follows no one / no tags yet
+          if (!Array.isArray(data) || data.length === 0) {
+            const pub = await fetchFrom(`${API_URL}/insights/public`, { 'Content-Type': 'application/json' });
+            setSingleInsight(null);
+            setInsights(Array.isArray(pub) ? pub : []);
+          } else {
+            setSingleInsight(null);
+            setInsights(data);
+          }
+
           setIsLoading(false);
           return;
         } else if (activeTab === 'trending') {
